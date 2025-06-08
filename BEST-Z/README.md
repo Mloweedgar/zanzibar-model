@@ -7,3 +7,11 @@ python scripts/main.py
 ```
 
 Outputs are saved in the `outputs/` directory with tables, maps, html, and geojson per scenario.
+
+## Installation
+
+Install the required Python packages from the repository root:
+
+```bash
+pip install -r requirements.txt
+```
