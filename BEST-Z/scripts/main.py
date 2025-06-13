@@ -1,5 +1,6 @@
-"""Run BEST-Z nitrogen model for all scenarios."""
+"""Run BEST-Z nitrogen model and generate maps."""
 
+import argparse
 import logging
 import webbrowser
 from pathlib import Path
@@ -13,15 +14,13 @@ from . import config, ingest, preprocess, n_load
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
 
-def run_scenario(name: str, scenario: dict) -> None:
-    """Execute one scenario."""
+def compute_scenario_data(name: str, scenario: dict) -> folium.GeoJson:
+    """Return GeoDataFrame for a scenario after writing outputs."""
     logging.info('Running scenario %s', name)
     table_dir = config.OUTPUT_DIR / 'tables' / name
-    map_png = config.OUTPUT_DIR / 'maps' / f'{name}.png'
-    html_path = config.OUTPUT_DIR / 'html' / f'{name}.html'
     geojson_path = config.OUTPUT_DIR / 'geojson' / f'{name}.geojson'
 
-    for d in [table_dir, map_png.parent, html_path.parent, geojson_path.parent]:
+    for d in [table_dir, geojson_path.parent]:
         d.mkdir(parents=True, exist_ok=True)
 
     hh = preprocess.clean_households()
@@ -37,6 +36,19 @@ def run_scenario(name: str, scenario: dict) -> None:
 
     gdf = preprocess.attach_geometry(ward)
     ingest.write_geojson(gdf[['ward_name', 'geometry', 'ward_total_n_load_kg']], geojson_path)
+    return gdf
+
+
+
+def run_scenario(name: str, scenario: dict, map_obj: folium.Map | None = None) -> None:
+    """Execute one scenario and optionally add it to ``map_obj``."""
+    map_png = config.OUTPUT_DIR / 'maps' / f'{name}.png'
+    html_path = config.OUTPUT_DIR / 'html' / f'{name}.html'
+
+    for d in [map_png.parent, html_path.parent]:
+        d.mkdir(parents=True, exist_ok=True)
+
+    gdf = compute_scenario_data(name, scenario)
 
     gdf.plot(column='ward_total_n_load_kg', cmap='YlOrRd', legend=True, figsize=(10, 8))
     plt.axis('off')
@@ -47,11 +59,17 @@ def run_scenario(name: str, scenario: dict) -> None:
 
     if gdf.crs and gdf.crs.to_string() != 'EPSG:4326':
         gdf = gdf.to_crs(epsg=4326)
-    m = folium.Map(location=[-6.1659, 39.2026], zoom_start=10, control_scale=True)
-    folium.TileLayer('OpenStreetMap', name='OpenStreetMap', overlay=False).add_to(m)
-    folium.TileLayer(
-        tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        attr='Esri', name='Esri Satellite', overlay=False).add_to(m)
+
+    if map_obj is None:
+        m = folium.Map(location=[-6.1659, 39.2026], zoom_start=10, control_scale=True)
+        folium.TileLayer('OpenStreetMap', name='OpenStreetMap', overlay=False).add_to(m)
+        folium.TileLayer(
+            tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            attr='Esri', name='Esri Satellite', overlay=False).add_to(m)
+        target_map = m
+    else:
+        target_map = map_obj
+
     folium.Choropleth(
         geo_data=gdf,
         data=gdf,
@@ -62,16 +80,74 @@ def run_scenario(name: str, scenario: dict) -> None:
         line_opacity=0.2,
         legend_name='Annual Nitrogen Load (kg)',
         nan_fill_color='white',
-        name='Nitrogen Load'
-    ).add_to(m)
+        name=name
+    ).add_to(target_map)
+
+    if map_obj is None:
+        Fullscreen().add_to(target_map)
+        folium.LayerControl().add_to(target_map)
+        target_map.save(html_path)
+        webbrowser.open(html_path.as_uri())
+    logging.info('Scenario %s completed', name)
+
+
+def run_combined_map() -> None:
+    """Run all configured scenarios and output one HTML map."""
+    html_path = config.OUTPUT_DIR / 'html' / 'combined.html'
+    html_path.parent.mkdir(parents=True, exist_ok=True)
+
+    m = folium.Map(location=[-6.1659, 39.2026], zoom_start=10, control_scale=True)
+    folium.TileLayer('OpenStreetMap', name='OpenStreetMap', overlay=False).add_to(m)
+    folium.TileLayer(
+        tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        attr='Esri', name='Esri Satellite', overlay=False).add_to(m)
+
+    for name, scenario in config.SCENARIOS.items():
+        run_scenario(name, scenario, map_obj=m)
+
     Fullscreen().add_to(m)
     folium.LayerControl().add_to(m)
     m.save(html_path)
     webbrowser.open(html_path.as_uri())
-    logging.info('Scenario %s completed', name)
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description='Run BEST-Z nitrogen load model')
+    parser.add_argument('--combined', action='store_true', help='combine all scenarios into one map')
+    parser.add_argument('--pop_factor', type=float, help='population scaling factor')
+    parser.add_argument('--nre_override', action='append', help='override removal efficiency as TOILET=VALUE')
+    parser.add_argument('--scenario', help='name of predefined scenario to run')
+    args = parser.parse_args()
+
+    if args.combined:
+        run_combined_map()
+        return
+
+    if args.pop_factor or args.nre_override:
+        overrides = {}
+        if args.nre_override:
+            for ov in args.nre_override:
+                if '=' in ov:
+                    key, val = ov.split('=', 1)
+                    try:
+                        overrides[key] = float(val)
+                    except ValueError:
+                        logging.warning('Invalid override %s', ov)
+        scenario = {
+            'pop_factor': args.pop_factor if args.pop_factor else 1.0,
+            'nre_override': overrides,
+        }
+        run_scenario('custom', scenario)
+        return
+
+    if args.scenario:
+        scenario = config.SCENARIOS.get(args.scenario)
+        if scenario is None:
+            logging.error('Scenario %s not found', args.scenario)
+            return
+        run_scenario(args.scenario, scenario)
+        return
+
     for name, scenario in config.SCENARIOS.items():
         run_scenario(name, scenario)
 
