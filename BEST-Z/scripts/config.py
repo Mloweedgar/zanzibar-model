@@ -16,10 +16,10 @@ SCENARIOS = {
     },
     'improved_removal': {
         'pop_factor': 1.0,
-        'nre_override': {'flush_septic': 0.70}
+        'nre_override': {'1': 0.80, '2': 0.80, '3': 0.80, '4': 0.80}
     },
     'pop_growth_2030': {
-        'pop_factor': 1.18,
+        'pop_factor': 1.2,
         'nre_override': {}
     }
 }

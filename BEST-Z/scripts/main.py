@@ -29,6 +29,12 @@ def run_scenario(name: str, scenario: dict) -> None:
 
     pop = preprocess.group_population(hh)
     pop = preprocess.add_removal_efficiency(pop)
+    # Debug: print toilet_type_id values missing removal efficiency
+    missing_eff = pop[pop['nitrogen_removal_efficiency'].isna()]['toilet_type_id'].unique()
+    if len(missing_eff) > 0:
+        print('Missing removal efficiency for toilet_type_id:', missing_eff)
+    else:
+        print('All toilet_type_id values have removal efficiency.')
     scenario_df = n_load.apply_scenario(pop, scenario)
     ingest.write_csv(scenario_df, table_dir / 'pop_toilet_nload.csv')
 
@@ -63,6 +69,16 @@ def run_scenario(name: str, scenario: dict) -> None:
         legend_name='Annual Nitrogen Load (kg)',
         nan_fill_color='white',
         name='Nitrogen Load'
+    ).add_to(m)
+    # Add popups for ward names
+    folium.GeoJson(
+        gdf,
+        name='Ward Names',
+        tooltip=folium.GeoJsonTooltip(
+            fields=['ward_name', 'ward_total_n_load_kg', 'H_DISTRICT_NAME', 'reg_name'],
+            aliases=['Ward:', 'N Load (kg):', 'District:', 'Region:']
+        ),
+        popup=folium.GeoJsonPopup(fields=['ward_name'], aliases=['Ward:'])
     ).add_to(m)
     Fullscreen().add_to(m)
     folium.LayerControl().add_to(m)

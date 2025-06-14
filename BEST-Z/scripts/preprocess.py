@@ -36,6 +36,8 @@ def add_removal_efficiency(pop_df: pd.DataFrame) -> pd.DataFrame:
     eff = ingest.read_csv(config.DATA_RAW / 'sanitation_removal_efficiencies_Zanzibar.csv')
     eff = eff[['toilet_type_id', 'nitrogen_removal_efficiency']]
     pop_df = pop_df.rename(columns={'TOILET': 'toilet_type_id'})
+    eff['toilet_type_id'] = eff['toilet_type_id'].astype(str).str.strip()
+    pop_df['toilet_type_id'] = pop_df['toilet_type_id'].astype(str).str.strip()
     merged = pop_df.merge(eff, on='toilet_type_id', how='left')
     return merged
 
