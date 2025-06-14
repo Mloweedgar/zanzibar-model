@@ -1,4 +1,5 @@
 BEST-Z/outputs
+BEST-Z/data_raw
 __pycache__/
 *.py[cod]
 *$py.class
