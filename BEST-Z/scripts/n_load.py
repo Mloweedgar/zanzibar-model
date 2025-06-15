@@ -9,10 +9,11 @@ def apply_scenario(pop_df: pd.DataFrame, scenario: dict) -> pd.DataFrame:
     """Return DataFrame with nitrogen load columns for a scenario."""
     df = pop_df.copy()
     df['population'] = df['population'] * scenario['pop_factor']
-    df['nre'] = df['nitrogen_removal_efficiency']
+    # Ensure nre column is float type to avoid dtype warnings
+    df['nre'] = df['nitrogen_removal_efficiency'].astype(float)
     for ttype, val in scenario['nre_override'].items():
         mask = df['toilet_type_id'].str.lower() == ttype
-        df.loc[mask, 'nre'] = val
+        df.loc[mask, 'nre'] = float(val)
     df['n_load_kg_y'] = (
         df['population'] * config.P_C * 365 * config.PTN * (1 - df['nre'])
     ) / 1000

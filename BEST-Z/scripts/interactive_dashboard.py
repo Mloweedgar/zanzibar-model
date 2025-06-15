@@ -51,6 +51,9 @@ def load_base_data():
     
     return pop, wards_gdf
 
+# Fixed scale maximum for consistent visualization
+FIXED_SCALE_MAX = 10000
+
 def calculate_scenario(pop_df, pop_factor, nre_overrides):
     """Calculate nitrogen loads for given parameters."""
     scenario = {
@@ -75,6 +78,11 @@ def create_map(gdf):
     if gdf.crs and gdf.crs.to_string() != 'EPSG:4326':
         gdf = gdf.to_crs(epsg=4326)
     
+    # Create a copy with capped values for choropleth visualization only
+    # Keep original values for tooltips and popups
+    gdf_viz = gdf.copy()
+    gdf_viz['ward_total_n_load_kg_viz'] = gdf['ward_total_n_load_kg'].clip(upper=FIXED_SCALE_MAX)
+    
     # Create base map
     m = folium.Map(
         location=[-6.1659, 39.2026], 
@@ -82,41 +90,88 @@ def create_map(gdf):
         control_scale=True
     )
     
-    # Add tile layers
-    folium.TileLayer('OpenStreetMap', name='OpenStreetMap', overlay=False).add_to(m)
+    # Add OpenStreetMap as default basemap
+    folium.TileLayer(
+        name='OpenStreetMap',
+        overlay=False,
+        control=True
+    ).add_to(m)
+    
+    # Add satellite tile layer as optional basemap
     folium.TileLayer(
         tiles='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         attr='Esri', 
         name='Esri Satellite', 
-        overlay=False
+        overlay=False,
+        control=True,
+        show=False
     ).add_to(m)
     
-    # Add choropleth layer
+    # Add choropleth layer with fixed scale (0 to 10,000 kg/year)
+    # Use 1000 kg steps - 10 intervals for better granularity
+    bins = [0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000]
+    
     folium.Choropleth(
-        geo_data=gdf,
-        data=gdf,
-        columns=['ward_name', 'ward_total_n_load_kg'],
+        geo_data=gdf_viz,
+        data=gdf_viz,
+        columns=['ward_name', 'ward_total_n_load_kg_viz'],
         key_on='feature.properties.ward_name',
         fill_color='YlOrRd',
         fill_opacity=0.7,
         line_opacity=0.2,
         legend_name='Annual Nitrogen Load (kg)',
         nan_fill_color='white',
-        name='Nitrogen Load'
+        name='Nitrogen Load',
+        bins=bins  # Use explicit bins for fixed scale
     ).add_to(m)
     
-    # Add tooltips and popups
+    # Add custom CSS to make legend more visible on dark satellite imagery
+    legend_css = """
+    <style>
+    .legend {
+        background-color: rgba(255, 255, 255, 0.9) !important;
+        border: 2px solid rgba(0, 0, 0, 0.2) !important;
+        border-radius: 5px !important;
+        box-shadow: 0 0 15px rgba(0, 0, 0, 0.2) !important;
+    }
+    .legend .legend-title {
+        color: black !important;
+        font-weight: bold !important;
+        font-size: 14px !important;
+        text-shadow: 1px 1px 1px rgba(255, 255, 255, 0.8) !important;
+    }
+    .legend .legend-scale ul {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .legend .legend-scale ul li {
+        color: black !important;
+        font-weight: bold !important;
+        font-size: 12px !important;
+        text-shadow: 1px 1px 1px rgba(255, 255, 255, 0.8) !important;
+    }
+    </style>
+    """
+    m.get_root().html.add_child(folium.Element(legend_css))
+    
+    # Add ward details layer (invisible, just for popups/tooltips on choropleth)
     folium.GeoJson(
         gdf,
         name='Ward Details',
+        style_function=lambda feature: {
+            'fillColor': 'transparent',
+            'color': 'transparent',
+            'weight': 0,
+            'fillOpacity': 0
+        },
         tooltip=folium.GeoJsonTooltip(
             fields=['ward_name', 'ward_total_n_load_kg', 'H_DISTRICT_NAME', 'reg_name'],
             aliases=['Ward:', 'N Load (kg):', 'District:', 'Region:'],
             localize=True
         ),
         popup=folium.GeoJsonPopup(
-            fields=['ward_name', 'ward_total_n_load_kg'], 
-            aliases=['Ward:', 'Nitrogen Load (kg):']
+            fields=['ward_name', 'ward_total_n_load_kg', 'H_DISTRICT_NAME', 'reg_name'],
+            aliases=['Ward:', 'N Load (kg):', 'District:', 'Region:'],
         )
     ).add_to(m)
     
@@ -224,6 +279,7 @@ def main():
     col2.metric("Max Ward Load", f"{max_ward_load:,.0f} kg/year")
     col3.metric("Min Ward Load", f"{min_ward_load:,.0f} kg/year")
     col4.metric("Average Ward Load", f"{avg_ward_load:,.0f} kg/year")
+
     
     # Create and display map
     with st.spinner("Generating map..."):
