@@ -49,10 +49,17 @@ def load_base_data():
     # Load ward geometry
     wards_gdf = ingest.read_geojson(config.DATA_RAW / 'unguja_wards.geojson')
     
-    return pop, wards_gdf
+    # Load toilet type names for better UX
+    toilet_types_df = ingest.read_csv(config.DATA_RAW / 'sanitation_removal_efficiencies_Zanzibar.csv')
+    toilet_types_df = toilet_types_df[['toilet_type_id', 'toilet_type', 'system_category']].copy()
+    toilet_types_df['toilet_type_id'] = toilet_types_df['toilet_type_id'].astype(str).str.strip()
+    
+    return pop, wards_gdf, toilet_types_df
 
-# Fixed scale maximum for consistent visualization
+# Fixed scale maximum for consistent visualization (in kg)
 FIXED_SCALE_MAX = 10000
+# Fixed scale maximum for display (in tonnes)
+FIXED_SCALE_MAX_TONNES = FIXED_SCALE_MAX / 1000
 
 def calculate_scenario(pop_df, pop_factor, nre_overrides):
     """Calculate nitrogen loads for given parameters."""
@@ -82,6 +89,9 @@ def create_map(gdf):
     # Keep original values for tooltips and popups
     gdf_viz = gdf.copy()
     gdf_viz['ward_total_n_load_kg_viz'] = gdf['ward_total_n_load_kg'].clip(upper=FIXED_SCALE_MAX)
+    # Add tonnes columns for display
+    gdf['ward_total_n_load_tonnes'] = gdf['ward_total_n_load_kg'] / 1000
+    gdf_viz['ward_total_n_load_tonnes_viz'] = gdf_viz['ward_total_n_load_kg_viz'] / 1000
     
     # Create base map
     m = folium.Map(
@@ -107,19 +117,19 @@ def create_map(gdf):
         show=False
     ).add_to(m)
     
-    # Add choropleth layer with fixed scale (0 to 10,000 kg/year)
-    # Use 1000 kg steps - 10 intervals for better granularity
-    bins = [0, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000]
+    # Add choropleth layer with fixed scale (0 to 10 tonnes/year)
+    # Use 1 tonne steps - 10 intervals for better granularity
+    bins = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     
     folium.Choropleth(
         geo_data=gdf_viz,
         data=gdf_viz,
-        columns=['ward_name', 'ward_total_n_load_kg_viz'],
+        columns=['ward_name', 'ward_total_n_load_tonnes_viz'],
         key_on='feature.properties.ward_name',
         fill_color='YlOrRd',
         fill_opacity=0.7,
         line_opacity=0.2,
-        legend_name='Annual Nitrogen Load (kg)',
+        legend_name='Annual Nitrogen Load (t)',
         nan_fill_color='white',
         name='Nitrogen Load',
         bins=bins  # Use explicit bins for fixed scale
@@ -165,13 +175,13 @@ def create_map(gdf):
             'fillOpacity': 0
         },
         tooltip=folium.GeoJsonTooltip(
-            fields=['ward_name', 'ward_total_n_load_kg', 'H_DISTRICT_NAME', 'reg_name'],
-            aliases=['Ward:', 'N Load (kg):', 'District:', 'Region:'],
+            fields=['ward_name', 'ward_total_n_load_tonnes', 'H_DISTRICT_NAME', 'reg_name'],
+            aliases=['Ward:', 'N Load (t):', 'District:', 'Region:'],
             localize=True
         ),
         popup=folium.GeoJsonPopup(
-            fields=['ward_name', 'ward_total_n_load_kg', 'H_DISTRICT_NAME', 'reg_name'],
-            aliases=['Ward:', 'N Load (kg):', 'District:', 'Region:'],
+            fields=['ward_name', 'ward_total_n_load_tonnes', 'H_DISTRICT_NAME', 'reg_name'],
+            aliases=['Ward:', 'N Load (t):', 'District:', 'Region:'],
         )
     ).add_to(m)
     
@@ -188,7 +198,7 @@ def main():
     
     # Load base data
     with st.spinner("Loading data..."):
-        pop_df, wards_gdf = load_base_data()
+        pop_df, wards_gdf, toilet_types_df = load_base_data()
     
     # Sidebar controls
     st.sidebar.header("Scenario Parameters")
@@ -227,41 +237,75 @@ def main():
     
     # Nitrogen removal efficiency overrides
     st.sidebar.subheader("Nitrogen Removal Efficiency Overrides")
-    st.sidebar.markdown("*Adjust removal efficiency for specific toilet types*")
+    st.sidebar.markdown("*Adjust removal efficiency for toilet types*")
     
-    # Get unique toilet types from data
-    toilet_types = pop_df['toilet_type_id'].unique()
-    toilet_types = sorted([t for t in toilet_types if pd.notna(t)])
+    # Group toilet types by system category
+    system_categories = toilet_types_df['system_category'].unique()
+    system_categories = sorted([cat for cat in system_categories if pd.notna(cat)])
     
     nre_overrides = {}
     
-    # Create sliders for each toilet type
-    for toilet_type in toilet_types:
-        # Get default efficiency
-        default_eff = pop_df[pop_df['toilet_type_id'] == toilet_type]['nitrogen_removal_efficiency'].iloc[0]
+    # Create sliders for each system category
+    for system_category in system_categories:
+        # Get toilet types in this system category
+        category_toilets = toilet_types_df[toilet_types_df['system_category'] == system_category]
+        
+        # Get toilet type IDs that exist in our population data
+        existing_toilet_ids = pop_df['toilet_type_id'].unique()
+        category_toilet_ids = category_toilets['toilet_type_id'].astype(str).str.strip()
+        relevant_toilet_ids = [tid for tid in category_toilet_ids if tid in existing_toilet_ids]
+        
+        if not relevant_toilet_ids:
+            continue
+            
+        # Get default efficiency (use the first toilet type's efficiency as representative)
+        first_toilet_id = relevant_toilet_ids[0]
+        default_eff = pop_df[pop_df['toilet_type_id'] == first_toilet_id]['nitrogen_removal_efficiency'].iloc[0]
         if pd.isna(default_eff):
             default_eff = 0.0
         
+        # Create help text with all toilet types in this category
+        help_text_lines = [f"Default: {default_eff:.2f}", "Toilet types in this category:"]
+        for toilet_id in relevant_toilet_ids:
+            toilet_info = toilet_types_df[toilet_types_df['toilet_type_id'] == toilet_id]
+            if not toilet_info.empty:
+                toilet_name = toilet_info['toilet_type'].iloc[0]
+                help_text_lines.append(f"• {toilet_name}")
+        help_text = "\n".join(help_text_lines)
+        
         # Determine value based on preset
         slider_value = float(default_eff)
-        if st.session_state.preset_applied == 'improved' and toilet_type in ['1', '2', '3', '4']:
+        if st.session_state.preset_applied == 'improved' and any(tid in ['1', '2', '3', '4'] for tid in relevant_toilet_ids):
             slider_value = 0.80
+        
+        # Create user-friendly label (just say "toilet types" not "system category")
+        if system_category == 'septic_tank_sewer':
+            display_label = "Sewer & Septic Tank Toilet Types"
+        elif system_category == 'septic_tank':
+            display_label = "Septic Tank Toilet Types"
+        elif system_category == 'pit_latrine':
+            display_label = "Pit Latrine Toilet Types"
+        elif system_category == 'open_defecation':
+            display_label = "Open Defecation Toilet Types"
+        else:
+            display_label = f"{system_category.replace('_', ' ').title()} Toilet Types"
         
         # Create slider
         override_val = st.sidebar.slider(
-            f"Toilet Type {toilet_type}",
+            display_label,
             min_value=0.0,
             max_value=1.0,
             value=slider_value,
             step=0.05,
             format="%.2f",
-            key=f"toilet_{toilet_type}",
-            help=f"Default: {default_eff:.2f}"
+            key=f"system_{system_category}",
+            help=help_text
         )
         
-        # Only add to overrides if different from default
+        # Apply override to all toilet types in this category if different from default
         if abs(override_val - default_eff) > 0.001:
-            nre_overrides[str(toilet_type)] = override_val
+            for toilet_id in relevant_toilet_ids:
+                nre_overrides[str(toilet_id)] = override_val
     
     # Calculate scenario
     with st.spinner("Calculating nitrogen loads..."):
@@ -270,15 +314,15 @@ def main():
     # Display summary statistics
     col1, col2, col3, col4 = st.columns(4)
     
-    total_n_load = gdf['ward_total_n_load_kg'].sum()
-    max_ward_load = gdf['ward_total_n_load_kg'].max()
-    min_ward_load = gdf['ward_total_n_load_kg'].min()
-    avg_ward_load = gdf['ward_total_n_load_kg'].mean()
+    total_n_load = gdf['ward_total_n_load_kg'].sum() / 1000  # Convert to tonnes
+    max_ward_load = gdf['ward_total_n_load_kg'].max() / 1000  # Convert to tonnes
+    min_ward_load = gdf['ward_total_n_load_kg'].min() / 1000  # Convert to tonnes
+    avg_ward_load = gdf['ward_total_n_load_kg'].mean() / 1000  # Convert to tonnes
     
-    col1.metric("Total N Load", f"{total_n_load:,.0f} kg/year")
-    col2.metric("Max Ward Load", f"{max_ward_load:,.0f} kg/year")
-    col3.metric("Min Ward Load", f"{min_ward_load:,.0f} kg/year")
-    col4.metric("Average Ward Load", f"{avg_ward_load:,.0f} kg/year")
+    col1.metric("Total N Load", f"{total_n_load:,.1f} t/year")
+    col2.metric("Max Ward Load", f"{max_ward_load:,.1f} t/year")
+    col3.metric("Min Ward Load", f"{min_ward_load:,.1f} t/year")
+    col4.metric("Average Ward Load", f"{avg_ward_load:,.1f} t/year")
 
     
     # Create and display map
@@ -296,7 +340,10 @@ def main():
     
     with col1:
         if st.button("Download Ward Data (CSV)"):
-            csv = gdf.drop(columns=['geometry']).to_csv(index=False)
+            # Prepare data for export with both kg and tonnes
+            export_df = gdf.drop(columns=['geometry']).copy()
+            export_df['ward_total_n_load_tonnes'] = export_df['ward_total_n_load_kg'] / 1000
+            csv = export_df.to_csv(index=False)
             st.download_button(
                 label="Download CSV",
                 data=csv,
@@ -306,7 +353,9 @@ def main():
     
     with col2:
         if st.button("Download GeoJSON"):
-            geojson = gdf[['ward_name', 'ward_total_n_load_kg', 'geometry']].to_json()
+            # Include both kg and tonnes in GeoJSON
+            geojson_df = gdf[['ward_name', 'ward_total_n_load_kg', 'ward_total_n_load_tonnes', 'geometry']].copy()
+            geojson = geojson_df.to_json()
             st.download_button(
                 label="Download GeoJSON",
                 data=geojson,
@@ -319,8 +368,37 @@ def main():
         st.write("**Population Factor:**", pop_factor)
         st.write("**Nitrogen Removal Efficiency Overrides:**")
         if nre_overrides:
+            # Group overrides by system category for cleaner display
+            overrides_by_category = {}
             for toilet_type, efficiency in nre_overrides.items():
-                st.write(f"- Toilet Type {toilet_type}: {efficiency:.2%}")
+                toilet_info = toilet_types_df[toilet_types_df['toilet_type_id'] == toilet_type]
+                if not toilet_info.empty:
+                    system_category = toilet_info['system_category'].iloc[0]
+                    if system_category not in overrides_by_category:
+                        overrides_by_category[system_category] = []
+                    toilet_name = toilet_info['toilet_type'].iloc[0]
+                    overrides_by_category[system_category].append((toilet_name, efficiency))
+            
+            for system_category, toilet_list in overrides_by_category.items():
+                # Create user-friendly category name
+                if system_category == 'septic_tank_sewer':
+                    category_display = "Sewer & Septic Tank Toilet Types"
+                elif system_category == 'septic_tank':
+                    category_display = "Septic Tank Toilet Types"
+                elif system_category == 'pit_latrine':
+                    category_display = "Pit Latrine Toilet Types"
+                elif system_category == 'open_defecation':
+                    category_display = "Open Defecation Toilet Types"
+                else:
+                    category_display = f"{system_category.replace('_', ' ').title()} Toilet Types"
+                
+                # Show efficiency (all toilets in category have same efficiency)
+                efficiency = toilet_list[0][1]  # Get efficiency from first toilet
+                st.write(f"- **{category_display}**: {efficiency:.2%}")
+                
+                # Show which specific toilet types are affected
+                for toilet_name, _ in toilet_list:
+                    st.write(f"  • {toilet_name}")
         else:
             st.write("- None (using default efficiencies)")
 
