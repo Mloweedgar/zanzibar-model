@@ -10,6 +10,10 @@ from . import ingest, config
 def clean_households() -> pd.DataFrame:
     """Return household records with toilet info."""
     path = config.DATA_RAW / 'Zanzibar_Census_Data2022.csv'
+    return clean_households_from_path(path)
+
+def clean_households_from_path(path: Path) -> pd.DataFrame:
+    """Return household records with toilet info from specific path."""
     df = ingest.read_csv(path)
     df = df[df['H_INSTITUTION_TYPE'] == ' ']
     df = df[df['TOILET'].notnull() & (df['TOILET'].astype(str).str.strip() != '')]
@@ -33,7 +37,12 @@ def group_population(df: pd.DataFrame) -> pd.DataFrame:
 
 def add_removal_efficiency(pop_df: pd.DataFrame) -> pd.DataFrame:
     """Join with removal efficiency table."""
-    eff = ingest.read_csv(config.DATA_RAW / 'sanitation_removal_efficiencies_Zanzibar.csv')
+    path = config.DATA_RAW / 'sanitation_removal_efficiencies_Zanzibar.csv'
+    return add_removal_efficiency_from_path(pop_df, path)
+
+def add_removal_efficiency_from_path(pop_df: pd.DataFrame, path: Path) -> pd.DataFrame:
+    """Join with removal efficiency table from specific path."""
+    eff = ingest.read_csv(path)
     eff = eff[['toilet_type_id', 'nitrogen_removal_efficiency']]
     pop_df = pop_df.rename(columns={'TOILET': 'toilet_type_id'})
     eff['toilet_type_id'] = eff['toilet_type_id'].astype(str).str.strip()

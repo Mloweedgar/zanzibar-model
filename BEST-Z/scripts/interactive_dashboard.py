@@ -7,6 +7,9 @@ import folium
 from folium.plugins import Fullscreen
 import logging
 from pathlib import Path
+import tempfile
+import os
+import io
 
 # Handle imports for both direct execution and module execution
 try:
@@ -34,25 +37,104 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+def save_uploaded_file(uploaded_file, target_path):
+    """Save uploaded file to target path."""
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(target_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
+
+def validate_census_data(df):
+    """Validate census data has required columns."""
+    required_cols = ['ward_name', 'TOILET', 'SEX', 'AGE']
+    missing_cols = [col for col in required_cols if col not in df.columns]
+    if missing_cols:
+        return False, f"Missing required columns: {missing_cols}"
+    return True, "Valid"
+
+def validate_sanitation_data(df):
+    """Validate sanitation efficiency data has required columns."""
+    required_cols = ['toilet_type_id', 'toilet_type', 'system_category', 'nitrogen_removal_efficiency']
+    missing_cols = [col for col in required_cols if col not in df.columns]
+    if missing_cols:
+        return False, f"Missing required columns: {missing_cols}"
+    return True, "Valid"
+
+def validate_geojson_data(gdf):
+    """Validate GeoJSON has required columns and geometry."""
+    if 'geometry' not in gdf.columns:
+        return False, "Missing geometry column"
+    required_cols = ['ward_name']
+    missing_cols = [col for col in required_cols if col not in gdf.columns]
+    if missing_cols:
+        return False, f"Missing required columns: {missing_cols}"
+    return True, "Valid"
+
 @st.cache_data
-def load_base_data():
+def load_base_data(use_uploaded=False):
     """Load and preprocess base data (cached for performance)."""
-    # Load household data
-    hh = preprocess.clean_households()
-    
-    # Group population by ward and toilet type
-    pop = preprocess.group_population(hh)
-    
-    # Add removal efficiency data
-    pop = preprocess.add_removal_efficiency(pop)
-    
-    # Load ward geometry
-    wards_gdf = ingest.read_geojson(config.DATA_RAW / 'unguja_wards.geojson')
-    
-    # Load toilet type names for better UX
-    toilet_types_df = ingest.read_csv(config.DATA_RAW / 'sanitation_removal_efficiencies_Zanzibar.csv')
-    toilet_types_df = toilet_types_df[['toilet_type_id', 'toilet_type', 'system_category']].copy()
-    toilet_types_df['toilet_type_id'] = toilet_types_df['toilet_type_id'].astype(str).str.strip()
+    if use_uploaded and 'uploaded_files' in st.session_state:
+        # Use uploaded files
+        uploaded_files = st.session_state.uploaded_files
+        
+        # Load household data from uploaded census file
+        census_df = pd.read_csv(io.StringIO(uploaded_files['census'].decode('utf-8')))
+        
+        # Create temporary files for processing
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_dir = Path(temp_dir)
+            
+            # Save uploaded files to temp directory
+            census_path = temp_dir / 'census.csv'
+            sanitation_path = temp_dir / 'sanitation.csv'
+            geojson_path = temp_dir / 'wards.geojson'
+            
+            census_df.to_csv(census_path, index=False)
+            
+            sanitation_df = pd.read_csv(io.StringIO(uploaded_files['sanitation'].decode('utf-8')))
+            sanitation_df.to_csv(sanitation_path, index=False)
+            
+            # Handle GeoJSON
+            geojson_str = uploaded_files['geojson'].decode('utf-8')
+            with open(geojson_path, 'w') as f:
+                f.write(geojson_str)
+            
+            # Temporarily update config paths
+            original_data_raw = config.DATA_RAW
+            config.DATA_RAW = temp_dir
+            
+            try:
+                # Process data using existing functions
+                hh = preprocess.clean_households_from_path(census_path)
+                pop = preprocess.group_population(hh)
+                pop = preprocess.add_removal_efficiency_from_path(pop, sanitation_path)
+                wards_gdf = ingest.read_geojson(geojson_path)
+                
+                # Load toilet type names for better UX
+                toilet_types_df = sanitation_df[['toilet_type_id', 'toilet_type', 'system_category']].copy()
+                toilet_types_df['toilet_type_id'] = toilet_types_df['toilet_type_id'].astype(str).str.strip()
+                
+            finally:
+                # Restore original config
+                config.DATA_RAW = original_data_raw
+                
+    else:
+        # Use default files
+        # Load household data
+        hh = preprocess.clean_households()
+        
+        # Group population by ward and toilet type
+        pop = preprocess.group_population(hh)
+        
+        # Add removal efficiency data
+        pop = preprocess.add_removal_efficiency(pop)
+        
+        # Load ward geometry
+        wards_gdf = ingest.read_geojson(config.DATA_RAW / 'unguja_wards.geojson')
+        
+        # Load toilet type names for better UX
+        toilet_types_df = ingest.read_csv(config.DATA_RAW / 'sanitation_removal_efficiencies_Zanzibar.csv')
+        toilet_types_df = toilet_types_df[['toilet_type_id', 'toilet_type', 'system_category']].copy()
+        toilet_types_df['toilet_type_id'] = toilet_types_df['toilet_type_id'].astype(str).str.strip()
     
     return pop, wards_gdf, toilet_types_df
 
@@ -196,12 +278,200 @@ def main():
     st.title("🌊 BEST-Z Nitrogen Model Dashboard")
     st.markdown("Interactive tool for exploring nitrogen load scenarios in Zanzibar")
     
+    # Data source selection
+    st.sidebar.header("📁 Data Source")
+    data_source = st.sidebar.radio(
+        "Choose data source:",
+        ["Use Default Data", "Upload Custom Data"],
+        help="Use default Zanzibar data or upload your own files"
+    )
+    
+    use_uploaded = False
+    
+    if data_source == "Upload Custom Data":
+        st.sidebar.subheader("Upload Data Files")
+        
+        # File upload widgets
+        census_file = st.sidebar.file_uploader(
+            "Census Data (CSV)",
+            type=['csv'],
+            help="CSV file with columns: ward_name, TOILET, SEX, AGE, H_INSTITUTION_TYPE"
+        )
+        
+        sanitation_file = st.sidebar.file_uploader(
+            "Sanitation Efficiency Data (CSV)",
+            type=['csv'],
+            help="CSV file with columns: toilet_type_id, toilet_type, system_category, nitrogen_removal_efficiency"
+        )
+        
+        geojson_file = st.sidebar.file_uploader(
+            "Ward Boundaries (GeoJSON)",
+            type=['geojson', 'json'],
+            help="GeoJSON file with ward geometries and ward_name column"
+        )
+        
+        # Validate and process uploaded files
+        if census_file and sanitation_file and geojson_file:
+            try:
+                # Read and validate files
+                census_df = pd.read_csv(census_file)
+                sanitation_df = pd.read_csv(sanitation_file)
+                geojson_str = geojson_file.read().decode('utf-8')
+                wards_gdf = gpd.read_file(io.StringIO(geojson_str))
+                
+                # Validate data
+                census_valid, census_msg = validate_census_data(census_df)
+                sanitation_valid, sanitation_msg = validate_sanitation_data(sanitation_df)
+                geojson_valid, geojson_msg = validate_geojson_data(wards_gdf)
+                
+                if census_valid and sanitation_valid and geojson_valid:
+                    # Store uploaded files in session state
+                    st.session_state.uploaded_files = {
+                        'census': census_file.getvalue(),
+                        'sanitation': sanitation_file.getvalue(),
+                        'geojson': geojson_file.getvalue()
+                    }
+                    use_uploaded = True
+                    st.sidebar.success("✅ All files uploaded and validated successfully!")
+                    
+                    # Show data summary
+                    with st.sidebar.expander("📊 Data Summary"):
+                        st.write(f"**Census records:** {len(census_df):,}")
+                        st.write(f"**Toilet types:** {len(sanitation_df)}")
+                        st.write(f"**Wards:** {len(wards_gdf)}")
+                        st.write(f"**Unique wards in census:** {census_df['ward_name'].nunique()}")
+                        
+                else:
+                    # Show validation errors
+                    if not census_valid:
+                        st.sidebar.error(f"❌ Census data: {census_msg}")
+                    if not sanitation_valid:
+                        st.sidebar.error(f"❌ Sanitation data: {sanitation_msg}")
+                    if not geojson_valid:
+                        st.sidebar.error(f"❌ GeoJSON data: {geojson_msg}")
+                        
+            except Exception as e:
+                st.sidebar.error(f"❌ Error processing files: {str(e)}")
+        
+        elif census_file or sanitation_file or geojson_file:
+            st.sidebar.warning("⚠️ Please upload all three required files")
+        else:
+            st.sidebar.info("📤 Upload all three data files to use custom data")
+            
+            # Show data format requirements
+            with st.sidebar.expander("📋 Required Data Formats"):
+                st.markdown("""
+                **Census Data (CSV):**
+                - ward_name: Ward name
+                - TOILET: Toilet type ID (1-11)
+                - SEX: Gender (1=Male, 2=Female)
+                - AGE: Age in years
+                - H_INSTITUTION_TYPE: Institution type (use ' ' for households)
+                
+                **Sanitation Efficiency (CSV):**
+                - toilet_type_id: Toilet type ID (1-11)
+                - toilet_type: Toilet type name
+                - system_category: System category
+                - nitrogen_removal_efficiency: Efficiency (0-1)
+                
+                **Ward Boundaries (GeoJSON):**
+                - ward_name: Ward name (must match census data)
+                - geometry: Ward polygon geometry
+                """)
+                
+                # Download template files
+                if st.button("📥 Download Template Files"):
+                    # Create sample census data
+                    sample_census = pd.DataFrame({
+                        'reg_name': ['Sample Region'] * 10,
+                        'H_DISTRICT_NAME': ['Sample District'] * 10,
+                        'H_COUNCIL_NAME': ['Sample Council'] * 10,
+                        'H_CONSTITUENCY_NAME': ['Sample Constituency'] * 10,
+                        'H_DIVISION_NAME': ['Sample Division'] * 10,
+                        'ward_name': ['Ward A'] * 5 + ['Ward B'] * 5,
+                        'H_INSTITUTION_TYPE': [' '] * 10,
+                        'TOILET': [1, 2, 3, 4, 5, 1, 2, 3, 4, 5],
+                        'SEX': [1, 2, 1, 2, 1, 2, 1, 2, 1, 2],
+                        'AGE': [25, 30, 35, 40, 45, 28, 32, 38, 42, 48]
+                    })
+                    
+                    # Create sample sanitation data
+                    sample_sanitation = pd.DataFrame({
+                        'toilet_type_id': ['1', '2', '3', '4', '5'],
+                        'toilet_type': [
+                            'Flush to sewer',
+                            'Flush to septic tank',
+                            'Flush to pit',
+                            'Flush elsewhere',
+                            'VIP latrine'
+                        ],
+                        'system_category': [
+                            'septic_tank_sewer',
+                            'septic_tank',
+                            'septic_tank',
+                            'septic_tank',
+                            'pit_latrine'
+                        ],
+                        'nitrogen_removal_efficiency': [0.0, 0.0, 0.0, 0.0, 0.0]
+                    })
+                    
+                    # Create sample GeoJSON
+                    sample_geojson = {
+                        "type": "FeatureCollection",
+                        "features": [
+                            {
+                                "type": "Feature",
+                                "properties": {"ward_name": "Ward A"},
+                                "geometry": {
+                                    "type": "Polygon",
+                                    "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]]
+                                }
+                            },
+                            {
+                                "type": "Feature", 
+                                "properties": {"ward_name": "Ward B"},
+                                "geometry": {
+                                    "type": "Polygon",
+                                    "coordinates": [[[1, 0], [2, 0], [2, 1], [1, 1], [1, 0]]]
+                                }
+                            }
+                        ]
+                    }
+                    
+                    # Provide download buttons
+                    col1, col2, col3 = st.columns(3)
+                    
+                    with col1:
+                        st.download_button(
+                            "Census Template",
+                            sample_census.to_csv(index=False),
+                            "census_template.csv",
+                            "text/csv"
+                        )
+                    
+                    with col2:
+                        st.download_button(
+                            "Sanitation Template",
+                            sample_sanitation.to_csv(index=False),
+                            "sanitation_template.csv",
+                            "text/csv"
+                        )
+                    
+                    with col3:
+                        import json
+                        st.download_button(
+                            "GeoJSON Template",
+                            json.dumps(sample_geojson, indent=2),
+                            "wards_template.geojson",
+                            "application/json"
+                        )
+    
     # Load base data
     with st.spinner("Loading data..."):
-        pop_df, wards_gdf, toilet_types_df = load_base_data()
+        pop_df, wards_gdf, toilet_types_df = load_base_data(use_uploaded=use_uploaded)
     
     # Sidebar controls
-    st.sidebar.header("Scenario Parameters")
+    st.sidebar.header("🎛️ Scenario Parameters")
     
     # Initialize session state
     if 'pop_factor' not in st.session_state:
