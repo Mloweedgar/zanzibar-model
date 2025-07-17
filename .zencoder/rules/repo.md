@@ -8,10 +8,30 @@ alwaysApply: true
 ## Summary
 BEST-Z is a geospatial modelling toolkit that quantifies nitrogen (N) loads from on-site sanitation across Zanzibar. The project is being architected to support additional nutrients (P) and pathogens (FIO) in subsequent phases. It combines Python data-science libraries, lightweight GIS tooling, and a Streamlit dashboard to translate raw census and sanitation data into actionable hotspot maps and scenario analyses.
 
+## Current Sanitation Context in Zanzibar
+According to the 2025 World Bank report, Zanzibar faces critical sanitation challenges:
+
+- **Population**: 1,889,773 (2022 census) growing at 3.7% annually, with 47.3% concentrated in Mjini Magharibi (893,169 people)
+- **Geology**: Coral rag limestone and karst landscapes make groundwater highly vulnerable to contamination
+- **Sewered Systems**: Only 18% of urban populations connected to sewers, primarily in Stone Town
+- **Non-Sewered Systems**: 47% use septic tanks/soak pits, often poorly constructed; 11.7% practice open defecation
+- **Discharge Points**: 25 concrete sea outfalls release approximately 12,000 m³/day of untreated sewage directly into the Indian Ocean
+- **Treatment Facilities**: Three main treatment sites with limited capacity:
+  - Kibele: Integrated facility (50m³/day capacity) using planted sludge drying beds and constructed wetlands
+  - Kizimbani: FSTP with 10m³/day capacity (currently non-operational)
+  - Matemwe: Informal disposal site with no treatment
+
+## Pollution Hotspots
+- **Stone Town Seafront**: High bacterial contamination (up to 10,000 CFU) and elevated nutrient levels
+- **Coastal Hotel Belt**: Tourism-related wastewater discharge
+- **Agricultural Areas**: Nutrient runoff from farming activities
+- **Urban Districts**: Industrial and market area pollution
+
 ## Why It Matters
 - **Environmental health**: Excess N threatens coral reefs, seagrass, and groundwater quality—critical to Zanzibar's tourism and fisheries.
 - **Investment guidance**: Load estimates feed cost-benefit analyses for upgraded toilets, DEWATS pilots, and nature-based solutions.
 - **Scalable architecture**: Modular codebase allows for adding phosphorus, fecal contamination, or climate-change stressors without rewrites.
+- **Public health**: 80% of marine pollution originates from land-based sources (UNEP, 2021), creating significant health risks.
 
 ## Repository Structure
 ```
@@ -77,34 +97,58 @@ docker-compose -f docker-compose.prod.yml up --build -d
 
 ## Proposed Interventions for Scenario Modeling
 
-The BEST-Z model is designed to evaluate the impact of various sanitation interventions. Based on recent reports from sanitation and marine experts, the following real-world interventions can be modeled as scenarios:
+The BEST-Z model is designed to evaluate the impact of various sanitation interventions. Based on the 2025 World Bank report and recent assessments from sanitation and marine experts, the following real-world interventions can be modeled as scenarios:
 
 ### Infrastructure Improvements
 1. **Waste Stabilization Ponds at Kisakasaka**: 
    - Located 12 km south of Stone Town
-   - Designed to serve the entire Stone Town area
+   - Designed to serve the entire Stone Town area (addressing 12,000 m³/day of untreated sewage)
    - Scenario parameters: Increased removal efficiency for connected areas, reduced direct discharge
+   - Current status: Proposed in World Bank report as priority intervention
 
 2. **Decentralized Wastewater Treatment Systems (DEWATS)**:
    - Constructed wetlands at strategic locations
    - Reduces operational costs (fuel for sludge trucks) compared to current long transportation distances
    - Scenario parameters: Localized treatment efficiency improvements, reduced transportation emissions
+   - Current example: Kizimbani DEWAT (10m³/day capacity, needs rehabilitation)
 
 3. **Rehabilitation of Existing Facilities**:
-   - Upgrade of Kibele and Matemwe treatment plants
+   - Upgrade of Kibele treatment plant (currently 50m³/day capacity)
+   - Formalization and upgrade of Matemwe disposal site (currently informal with no treatment)
    - Scenario parameters: Increased capacity and improved removal efficiency at specific locations
+   - Current status: Kibele uses planted sludge drying beds and constructed wetlands but needs expansion
 
 4. **Sewer Network Rehabilitation**:
-   - Repair of broken sections and manholes
+   - Repair of broken sections and manholes in Stone Town's 32km pipe network
+   - Address 25 concrete sea outfalls currently discharging untreated sewage
    - Scenario parameters: Reduced leakage, improved collection efficiency
+   - Current status: Frequent blockages due to solid waste, no treatment plants
 
 ### Policy and Management Changes
 1. **Sludge Disposal Regulation Enforcement**:
+   - Target the 11.7% open defecation rate (highest in Kusini Unguja)
+   - Address informal dumping at locations like Matemwe
    - Scenario parameters: Reduced illegal dumping, increased proportion of waste reaching treatment facilities
+   - Current status: Limited enforcement, only 13 vacuum trucks available (2 owned by city council)
 
 2. **Sewage Redirection**:
    - Redirecting sewage from Stone Town to pumping stations en route to treatment facilities
+   - Target the 25 outfalls along the 7km Stone Town shoreline
    - Scenario parameters: Changed flow patterns, reduced direct marine discharge
+   - Current status: Combined stormwater and sewage system with direct ocean discharge
+
+### Specific Pollution Hotspots to Target
+1. **Stone Town Seafront**:
+   - Current data: Bacterial contamination up to 10,000 CFU; elevated ammonia, nitrate, and phosphate levels
+   - Priority area due to tourism, fishing, and recreational activities
+
+2. **Coastal Hotel Belt**:
+   - Tourism-related wastewater discharge
+   - Economic importance for Zanzibar's blue economy
+
+3. **Urban Districts (Mjini Magharibi)**:
+   - Highest population density (893,169 people, 47.3% of total)
+   - Industrial and market area pollution
 
 ### Detailed Scenario Modeling Approach
 
@@ -542,22 +586,44 @@ def apply_scenario_targeted(pop_df, scenario, ward_classifications):
 
 ### Data Collection Priorities
 
-To enable more sophisticated modeling, these data collection efforts would be most valuable:
+Based on the World Bank report and our analysis, these data collection efforts would be most valuable:
 
 1. **High Priority**:
    - Ward classification table (Stone Town, urban, rural)
    - Service area boundaries for Kisakasaka WSP, Kibele, and Matemwe
    - Baseline field measurements of nitrogen concentrations for model validation
+   - Wastewater generation data (current estimate: 12,000 m³/day from Stone Town)
 
 2. **Medium Priority**:
    - Realistic sanitation transition rates based on local adoption patterns
    - Potential DEWATS locations based on geographic suitability
    - Implementation cost estimates for different intervention types
+   - Monitoring data for the 25 sea outfalls along Stone Town's 7km shoreline
 
 3. **Lower Priority**:
    - Household-level geolocation data
-   - Detailed hydrogeological data
+   - Detailed hydrogeological data (coral rag limestone and karst landscapes)
    - Economic valuation of environmental benefits
+   - Watershed delineation for runoff modeling
+
+### Known Data Gaps from World Bank Report
+
+The 2025 World Bank report identified several critical data gaps that affect modeling accuracy:
+
+1. **Monitoring System Gaps**:
+   - No regular monitoring of groundwater quality in high-risk areas
+   - Limited seawater quality data (bacterial and nutrient levels)
+   - No systematic tracking of faecal sludge volumes and disposal locations
+
+2. **Infrastructure Documentation Gaps**:
+   - Incomplete mapping of the 32km sewer network in Stone Town
+   - Unknown condition assessment for many sections of the network
+   - Limited data on actual treatment capacity utilization at Kibele and Kizimbani
+
+3. **Population and Behavior Data**:
+   - Limited data on actual population served by different sanitation types
+   - No comprehensive survey of sanitation practices in informal settlements
+   - Incomplete data on seasonal population variations due to tourism
 
 This practical assessment provides a realistic roadmap for implementing the BEST-Z model in the Zanzibar context, focusing on what can be achieved with existing data while identifying key data gaps for future enhancement.
 
