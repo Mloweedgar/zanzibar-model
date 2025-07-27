@@ -1,0 +1,260 @@
+"""Map creation functions for the BEST-Z dashboard."""
+
+import folium
+from folium.plugins import Fullscreen
+import numpy as np
+from .dashboard_constants import (
+    MAP_CENTER, 
+    MAP_ZOOM_START, 
+    NITROGEN_BINS, 
+    FIXED_SCALE_MAX,
+    TILE_LAYERS,
+    LEGEND_CSS
+)
+
+
+def ensure_wgs84_crs(gdf):
+    """Ensure GeoDataFrame is in WGS84 CRS for Folium compatibility."""
+    if gdf.crs and gdf.crs.to_string() != 'EPSG:4326':
+        return gdf.to_crs(epsg=4326)
+    return gdf
+
+
+def add_base_layers(m):
+    """Add base tile layers to a Folium map."""
+    # Add OpenStreetMap as default basemap
+    folium.TileLayer(
+        name=TILE_LAYERS['openstreetmap']['name'],
+        overlay=TILE_LAYERS['openstreetmap']['overlay'],
+        control=TILE_LAYERS['openstreetmap']['control']
+    ).add_to(m)
+    
+    # Add satellite tile layer as optional basemap
+    folium.TileLayer(
+        tiles=TILE_LAYERS['satellite']['tiles'],
+        attr=TILE_LAYERS['satellite']['attr'],
+        name=TILE_LAYERS['satellite']['name'],
+        overlay=TILE_LAYERS['satellite']['overlay'],
+        control=TILE_LAYERS['satellite']['control'],
+        show=TILE_LAYERS['satellite']['show']
+    ).add_to(m)
+
+
+def add_map_controls(m):
+    """Add standard controls to a Folium map."""
+    Fullscreen().add_to(m)
+    folium.LayerControl().add_to(m)
+
+
+def create_base_map():
+    """Create a base Folium map with standard configuration."""
+    m = folium.Map(
+        location=MAP_CENTER, 
+        zoom_start=MAP_ZOOM_START, 
+        control_scale=True
+    )
+    add_base_layers(m)
+    return m
+
+
+def create_nitrogen_map(gdf):
+    """Create Folium map with nitrogen load data."""
+    # Ensure CRS is WGS84 for Folium
+    gdf = ensure_wgs84_crs(gdf)
+    
+    # Create a copy with capped values for choropleth visualization only
+    # Keep original values for tooltips and popups
+    gdf_viz = gdf.copy()
+    gdf_viz['ward_total_n_load_kg_viz'] = gdf['ward_total_n_load_kg'].clip(upper=FIXED_SCALE_MAX)
+    # Add tonnes columns for display
+    gdf['ward_total_n_load_tonnes'] = gdf['ward_total_n_load_kg'] / 1000
+    gdf_viz['ward_total_n_load_tonnes_viz'] = gdf_viz['ward_total_n_load_kg_viz'] / 1000
+    
+    # Create base map
+    m = create_base_map()
+    
+    # Add choropleth layer with fixed scale
+    folium.Choropleth(
+        geo_data=gdf_viz,
+        data=gdf_viz,
+        columns=['ward_name', 'ward_total_n_load_tonnes_viz'],
+        key_on='feature.properties.ward_name',
+        fill_color='YlOrRd',
+        fill_opacity=0.7,
+        line_opacity=0.2,
+        legend_name='Annual Nitrogen Load (t)',
+        nan_fill_color='white',
+        name='Nitrogen Load',
+        bins=NITROGEN_BINS
+    ).add_to(m)
+    
+    # Add custom CSS to make legend more visible
+    m.get_root().html.add_child(folium.Element(LEGEND_CSS))
+    
+    # Add ward details layer for tooltips/popups
+    folium.GeoJson(
+        gdf,
+        name='Ward Details',
+        style_function=lambda feature: {
+            'fillColor': 'transparent',
+            'color': 'transparent',
+            'weight': 0,
+            'fillOpacity': 0
+        },
+        tooltip=folium.GeoJsonTooltip(
+            fields=['ward_name', 'ward_total_n_load_tonnes', 'H_DISTRICT_NAME', 'reg_name'],
+            aliases=['Ward:', 'N Load (t):', 'District:', 'Region:'],
+            localize=True
+        ),
+        popup=folium.GeoJsonPopup(
+            fields=['ward_name', 'ward_total_n_load_tonnes', 'H_DISTRICT_NAME', 'reg_name'],
+            aliases=['Ward:', 'N Load (t):', 'District:', 'Region:'],
+        )
+    ).add_to(m)
+    
+    # Add controls
+    add_map_controls(m)
+    
+    return m
+
+
+def create_fio_map(gdf, column, legend_name, colormap='YlOrRd'):
+    """Create folium map with FIO load choropleth."""
+    # Ensure CRS is WGS84 for Folium
+    gdf = ensure_wgs84_crs(gdf)
+    
+    # Create base map
+    m = create_base_map()
+    
+    # Add choropleth
+    folium.Choropleth(
+        geo_data=gdf,
+        data=gdf,
+        columns=['ward_name', column],
+        key_on='feature.properties.ward_name',
+        fill_color=colormap,
+        fill_opacity=0.7,
+        line_opacity=0.2,
+        legend_name=legend_name,
+        name=legend_name
+    ).add_to(m)
+    
+    # Add tooltip with FIO data
+    folium.GeoJson(
+        gdf,
+        name='Ward Details',
+        style_function=lambda feature: {
+            'fillColor': 'transparent',
+            'color': 'transparent',
+            'weight': 0,
+            'fillOpacity': 0
+        },
+        tooltip=folium.GeoJsonTooltip(
+            fields=['ward_name', 'ward_total_fio_cfu_day', 'ward_open_fio_cfu_day', 'open_share_percent'],
+            aliases=['Ward:', 'Total FIO Load:', 'Open Def. Load:', 'Open Share (%):'],
+            localize=True,
+            labels=True
+        ),
+        popup=folium.GeoJsonPopup(
+            fields=['ward_name', 'ward_total_fio_cfu_day', 'ward_open_fio_cfu_day', 'open_share_percent', 'ward_total_population'],
+            aliases=['Ward:', 'Total FIO (cfu/day):', 'Open Def. (cfu/day):', 'Open Share (%):', 'Population:'],
+        )
+    ).add_to(m)
+    
+    # Add controls
+    add_map_controls(m)
+    
+    return m
+
+
+def create_hotspots_map(gdf, top_wards):
+    """Create folium map highlighting open defecation hot-spots."""
+    # Ensure CRS is WGS84 for Folium
+    gdf = ensure_wgs84_crs(gdf)
+    
+    # Create base map
+    m = create_base_map()
+    
+    # Add base choropleth for open defecation share
+    folium.Choropleth(
+        geo_data=gdf,
+        data=gdf,
+        columns=['ward_name', 'open_share_percent'],
+        key_on='feature.properties.ward_name',
+        fill_color='Oranges',
+        fill_opacity=0.6,
+        line_opacity=0.2,
+        legend_name='Open Defecation Share (%)',
+        name='All Wards'
+    ).add_to(m)
+    
+    # Highlight top 10 wards with different style
+    top_ward_names = set(top_wards['ward_name'].tolist())
+    
+    def style_function(feature):
+        if feature['properties']['ward_name'] in top_ward_names:
+            return {
+                'fillColor': 'red',
+                'color': 'darkred',
+                'weight': 3,
+                'fillOpacity': 0.8,
+                'dashArray': '5, 5'
+            }
+        else:
+            return {
+                'fillColor': 'transparent',
+                'color': 'transparent',
+                'weight': 0,
+                'fillOpacity': 0
+            }
+    
+    # Add highlighted layer for hot-spots
+    folium.GeoJson(
+        gdf,
+        name='Top 10 Hot-Spots',
+        style_function=style_function,
+        tooltip=folium.GeoJsonTooltip(
+            fields=['ward_name', 'ward_open_fio_cfu_day', 'open_share_percent', 'ward_total_population'],
+            aliases=['Ward:', 'OD Load (cfu/day):', 'OD Share (%):', 'Population:'],
+            localize=True,
+            labels=True
+        ),
+        popup=folium.GeoJsonPopup(
+            fields=['ward_name', 'ward_open_fio_cfu_day', 'open_share_percent', 'ward_total_population'],
+            aliases=['Ward:', 'OD Load (cfu/day):', 'OD Share (%):', 'Population:'],
+        )
+    ).add_to(m)
+    
+    # Add controls
+    add_map_controls(m)
+    
+    return m
+
+
+def create_contamination_map(gdf, map_story):
+    """
+    Create appropriate contamination map based on story selection.
+    
+    Args:
+        gdf: GeoDataFrame with contamination data
+        map_story: Story type to display
+        
+    Returns:
+        tuple: (map_object, description)
+    """
+    if "disease hot-spots" in map_story:
+        description = "**🔴 Red areas show highest open defecation contamination = highest disease risk**"
+        fio_map = create_fio_map(gdf, 'open_share_percent', 'Disease Risk: Open Defecation Share (%)', 'Reds')
+    elif "overall contamination" in map_story:
+        description = "**🟠 Darker areas show higher total pathogen loads**"
+        gdf['ward_total_fio_cfu_day_log10'] = np.log10(gdf['ward_total_fio_cfu_day'] + 1)
+        fio_map = create_fio_map(gdf, 'ward_total_fio_cfu_day_log10', 'Total Pathogen Load (Log scale)', 'YlOrRd')
+    else:  # intervention priorities
+        description = "**🎯 Highlighted wards show top 10 priorities for intervention**"
+        # Get top wards for hotspots map
+        od_top_wards = gdf.nlargest(10, 'ward_open_fio_cfu_day')[
+            ['ward_name', 'ward_open_fio_cfu_day', 'open_share_percent', 'ward_total_population']
+        ].copy()
+        fio_map = create_hotspots_map(gdf, od_top_wards)
+    
+    return fio_map, description 
