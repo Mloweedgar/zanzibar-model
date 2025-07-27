@@ -1,69 +1,38 @@
-# zanzibar-model
+# BEST-Z Model Dashboard
 
-Contains the BEST-Z nitrogen load workflows in the `BEST-Z` folder.
+## 📖 Overview
 
-## Installation
+Interactive dashboard for exploring nitrogen and pathogen load scenarios in Zanzibar using the BEST-Z model.
 
-### Local Installation
+## 🚀 Quick Start
 
-Install the required Python packages:
+1. **Install Dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-```bash
-pip install -r requirements.txt
-```
+2. **Run the Dashboard**
+   ```bash
+   python run_dashboard.py
+   ```
 
-### Docker Deployment
+3. **Open in Browser**
+   - Navigate to `http://localhost:8501`
+   - The dashboard will load with default Zanzibar data
 
-For easy deployment using Docker:
+## 🎯 Features
 
-```bash
-# Development mode
-docker-compose up --build
+- **Interactive maps** showing nitrogen and pathogen loads by ward
+- **Scenario modeling** with population growth and efficiency parameters
+- **Public health insights** focused on contamination hot-spots
+- **Intervention impact assessment** for policy decision making
 
-# Production mode
-docker-compose -f docker-compose.prod.yml up --build -d
-```
+## 🐳 Docker Deployment
 
-See [DOCKER_DEPLOYMENT.md](DOCKER_DEPLOYMENT.md) for detailed deployment instructions.
+See [DOCKER_DEPLOYMENT.md](docs/DOCKER_DEPLOYMENT.md) for containerized deployment instructions.
 
-## Running the Dashboard
+## 📚 Documentation
 
-### Local Development
-```bash
-python run_dashboard.py
-```
-
-### Docker
-The dashboard will be available at:
-- Development: http://localhost:8501
-- Production: http://localhost
-
-## 📁 Custom Data Upload
-
-The dashboard now supports uploading your own data files! You can:
-
-- **Upload custom census data** (CSV format)
-- **Upload sanitation efficiency data** (CSV format) 
-- **Upload ward boundary files** (GeoJSON format)
-
-### Quick Start with Custom Data
-
-1. Open the dashboard
-2. Select "Upload Custom Data" in the sidebar
-3. Upload your three required files
-4. The dashboard will validate and process your data automatically
-
-### Data Format Requirements
-
-See [DATA_UPLOAD_GUIDE.md](DATA_UPLOAD_GUIDE.md) for detailed information about:
-- Required file formats and columns
-- Data validation requirements
-- Template files for download
-- Troubleshooting common issues
-
-### Template Files
-
-Download template files directly from the dashboard:
-1. Select "Upload Custom Data" 
-2. Expand "📋 Required Data Formats"
-3. Click "📥 Download Template Files"
+- [User Manual](docs/USER_MANUAL.md) - Complete dashboard guide
+- [Model Implementation Report](docs/BEST-Z_Model_Implementation_Report.md) - Technical details
+- [Enhancement Work Plan](docs/BEST-Z_Enhancement_Work_Plan.md) - Development roadmap

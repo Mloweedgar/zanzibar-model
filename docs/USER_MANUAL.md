@@ -1,88 +1,35 @@
-# BEST-Z Nitrogen Model - User Manual
+# BEST-Z Dashboard User Manual
 
-## What This Tool Does
+## 📖 Overview
 
-The BEST-Z Nitrogen Model calculates how much nitrogen pollution comes from household sanitation systems in Zanzibar. It helps you:
+The BEST-Z Dashboard is an interactive tool for exploring nitrogen and pathogen contamination scenarios in Zanzibar. The dashboard uses default Zanzibar data to help decision makers understand public health risks and plan sanitation interventions.
 
-- **See which areas have the highest nitrogen pollution** from poor sanitation
-- **Compare different scenarios** (current conditions vs. improved sanitation vs. population growth)
-- **Identify priority areas** for sanitation improvements
-- **Visualize results on interactive maps**
+## 🚀 Getting Started
 
-## Getting Started
+### System Requirements
+- Modern web browser (Chrome, Firefox, Safari, Edge)
+- Internet connection (for initial setup)
 
-### Access the Tool
-**Open your web browser and go to:** http://51.20.7.134/
+### Opening the Dashboard
+1. Navigate to the dashboard URL (provided by your administrator)
+2. The dashboard will automatically load with default Zanzibar data
+3. Start exploring scenarios using the sidebar controls
 
-No installation required - the tool runs in your browser!
+## 🎯 Main Features
 
-### Choose Your Data
-When you open the tool, you can:
-- **Use built-in Zanzibar data** (ready to use immediately), OR
-- **Upload your own data files** (for other regions or updated data)
+### 1. **Pathogen Analysis Tab** 🦠
+Focus on disease contamination and public health risks:
+- Interactive contamination maps showing disease hot-spots
+- Real-time intervention impact modeling
+- Priority ward identification for urgent action
 
-## How the Model Works
+### 2. **Nitrogen Analysis Tab** 🧪  
+Technical nitrogen load modeling:
+- Ward-level nitrogen load visualization
+- Scenario parameter adjustment
+- Data export capabilities
 
-### The Calculation
-The model calculates nitrogen load using this formula:
-```
-Nitrogen Load = Population × Daily Protein × 365 days × 0.16 × (1 - Removal Efficiency)
-```
-
-**Where:**
-- **Population**: Number of people using each toilet type
-- **Daily Protein**: 64 grams per person per day (fixed)
-- **0.16**: Conversion factor from protein to nitrogen (fixed)
-- **Removal Efficiency**: How much nitrogen the toilet system removes (0% to 100%)
-
-### Toilet Types and Removal Rates
-| Toilet Type | Nitrogen Removal |
-|-------------|------------------|
-| Flush to sewer | 0% (baseline) |
-| Flush to septic tank | 0% (baseline) |
-| Flush to pit | 0% (baseline) |
-| VIP latrine | 0% (baseline) |
-| Pit latrine (various types) | 0% (baseline) |
-| No facility/open defecation | 0% (baseline) |
-
-**Note:** The model uses 0% removal efficiency as baseline, but you can test "improved sanitation" scenarios with higher removal rates.
-
-## Using Your Own Data
-
-### Required Files (3 files total)
-
-#### 1. Census Data (CSV file)
-**Must include these columns:**
-- `ward_name`: Name of the area
-- `TOILET`: Toilet type (number 1-11)
-- `SEX`: Gender (1=Male, 2=Female)  
-- `AGE`: Age in years
-- `reg_name`: Region name
-- `H_DISTRICT_NAME`: District name
-- `H_COUNCIL_NAME`: Council name
-- `H_CONSTITUENCY_NAME`: Constituency name
-- `H_DIVISION_NAME`: Division name
-- `H_INSTITUTION_TYPE`: Use single space ' ' for households
-
-#### 2. Sanitation Efficiency Data (CSV file)
-**Must include these columns:**
-- `toilet_type_id`: Toilet type number (1-11)
-- `toilet_type`: Description of toilet type
-- `system_category`: Category (septic_tank_sewer, septic_tank, pit_latrine, open_defecation)
-- `nitrogen_removal_efficiency`: Removal rate (0.0 to 1.0)
-
-#### 3. Ward Boundaries (GeoJSON file)
-**Must include:**
-- `ward_name`: Area name (matching census data)
-- Geographic boundaries for mapping
-
-### Upload Process
-1. **Select "Upload Custom Data"** in the dashboard sidebar
-2. **Upload all 3 files** using the file upload buttons
-3. **Wait for validation** - the system will check your data
-4. **Run the model** once validation passes
-
-## Understanding Your Results
+## 📊 Understanding Your Results
 
 ### Main Outputs
 
@@ -108,7 +55,7 @@ Nitrogen Load = Population × Daily Protein × 365 days × 0.16 × (1 - Removal 
 - **kg/person/year**: Nitrogen load per person (for comparing areas of different sizes)
 - **Hotspots**: Areas with highest total loads (priority for interventions)
 
-## Scenarios You Can Test
+## 🎛️ Scenarios You Can Test
 
 ### 1. Baseline 2022
 - Current population and sanitation conditions
@@ -118,73 +65,60 @@ Nitrogen Load = Population × Daily Protein × 365 days × 0.16 × (1 - Removal 
 - Same population, but with 80% nitrogen removal efficiency
 - Shows impact of upgrading sanitation systems
 
-### 3. Population Growth 2030
-- 20% population increase with current sanitation
-- Shows future pollution if no improvements made
+### 3. Population Growth  
+- Test different population growth scenarios
+- Plan for future infrastructure needs
 
-### 4. Custom Scenarios
-- Upload your own data with different parameters
-- Test specific improvement plans
+### 4. Custom Efficiency
+- Experiment with different removal efficiencies by toilet type
+- Model specific technology improvements
 
-## Troubleshooting
+## 💡 Tips for Decision Makers
 
-### File Upload Issues
-**Problem**: "File validation failed"
-**Solutions:**
-- Check that column names match exactly (case-sensitive)
-- Ensure ward names are identical across all files
-- Use UTF-8 encoding for CSV files
-- Remove empty rows and columns
+### Quick Impact Assessment
+1. **Start with Pathogen Tab** - shows immediate health risks
+2. **Identify hot-spot wards** - focus resources where most needed
+3. **Test intervention scenarios** - see which changes have biggest impact
+4. **Export priority ward lists** - for action planning
 
-**Problem**: "No data displayed"
-**Solutions:**
-- Verify toilet type numbers (1-11) in census data
-- Check that efficiency data covers all toilet types
-- Ensure ward boundaries contain all census areas
+### Interpreting Health Risks
+- **Open defecation contamination** = immediate disease risk
+- **High pathogen load wards** = priority for emergency intervention  
+- **Intervention impact %** = expected health improvement
 
-### Performance Issues
-**Problem**: Dashboard runs slowly
-**Solutions:**
-- Use smaller datasets for testing
-- Close other browser tabs
-- Refresh the page if it becomes unresponsive
-- Try again later if the server is busy
+## 🔧 Advanced Features
 
-### Map Display Issues
-**Problem**: Map doesn't show or looks wrong
-**Solutions:**
-- Check that GeoJSON file is valid
-- Ensure coordinate system is WGS84 (EPSG:4326)
-- Verify ward names match between files
+### Scenario Parameters
+- **Population Growth Factor**: Adjust future population projections
+- **Nitrogen Removal Efficiency**: Model technology improvements
+- **Preset Scenarios**: Quick access to common modeling scenarios
 
-## Getting Help
+### Data Export
+- Download results as CSV files for further analysis
+- Export maps for presentations and reports
+- Share findings with stakeholders
 
-### Download Template Files
-1. Go to http://51.20.7.134/
-2. In the sidebar, select "Upload Custom Data"
-3. Expand "Required Data Formats"
-4. Click "Download Template Files"
+## ❓ Troubleshooting
 
-### Common Questions
+### Common Issues
 
-**Q: Can I use data from other countries?**
-A: Yes, but you'll need census data in the required format and geographic boundaries.
+#### Dashboard Loading Slowly
+- **Cause**: Large dataset processing
+- **Solution**: Wait for data caching to complete (first load only)
 
-**Q: How accurate are the results?**
-A: Results are estimates based on input data quality. Use for relative comparisons between areas.
+#### Map Not Displaying
+- **Cause**: Browser compatibility or internet connection
+- **Solution**: Try refreshing page or different browser
 
-**Q: Can I change the protein consumption rate?**
-A: Currently fixed at 64g/day. This is built into the model.
+#### Scenario Results Look Wrong
+- **Cause**: Extreme parameter values
+- **Solution**: Reset to default values and adjust gradually
 
-**Q: What if I don't have all the administrative levels?**
-A: You can use the same name for multiple levels (e.g., use ward name for both district and council).
+## 📞 Support
 
-**Q: Is my data secure?**
-A: Data uploaded to the tool is processed temporarily and not permanently stored on the server.
+For technical support or questions about model methodology:
+- Contact your dashboard administrator
+- Refer to the Model Implementation Report for technical details
 
-**Q: Can I save my results?**
-A: Yes, you can download results as CSV files, GeoJSON files, or PNG maps directly from the tool.
-
----
-
-**Need more help?** The tool includes built-in help sections and template downloads at http://51.20.7.134/
+Q: **Is my analysis data secure?**
+A: The dashboard uses default Zanzibar data and all analysis runs locally in your browser session.

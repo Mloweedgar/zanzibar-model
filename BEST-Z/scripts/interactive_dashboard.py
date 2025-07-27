@@ -9,9 +9,7 @@ try:
     from . import config, n_load, fio_load, preprocess
     from .dashboard_constants import PAGE_CONFIG
     from .dashboard_data_loader import load_base_data
-    from .dashboard_file_upload import handle_file_upload_section
     from .dashboard_ui_components import (
-        create_sidebar_data_source_section,
         create_preset_scenario_buttons,
         create_population_slider,
         create_efficiency_override_sliders,
@@ -38,9 +36,7 @@ except ImportError:
     from scripts import config, n_load, fio_load, preprocess
     from scripts.dashboard_constants import PAGE_CONFIG
     from scripts.dashboard_data_loader import load_base_data
-    from scripts.dashboard_file_upload import handle_file_upload_section
     from scripts.dashboard_ui_components import (
-        create_sidebar_data_source_section,
         create_preset_scenario_buttons,
         create_population_slider,
         create_efficiency_override_sliders,
@@ -206,17 +202,9 @@ def main():
     # Initialize session state
     initialize_session_state()
     
-    # Data source selection
-    data_source = create_sidebar_data_source_section()
-    
-    use_uploaded = False
-    
-    if data_source == "Upload Custom Data":
-        use_uploaded = handle_file_upload_section()
-    
-    # Load base data
+    # Load base data (always use default data)
     with st.spinner("Loading data..."):
-        pop_df, wards_gdf, toilet_types_df = load_base_data(use_uploaded=use_uploaded)
+        pop_df, wards_gdf, toilet_types_df = load_base_data()
     
     # Sidebar controls
     st.sidebar.header("🎛️ Scenario Parameters")

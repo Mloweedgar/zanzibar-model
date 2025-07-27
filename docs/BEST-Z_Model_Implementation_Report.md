@@ -380,8 +380,8 @@ The interactive dashboard is built using Streamlit, providing a web-based interf
 #### Main Application Structure (`interactive_dashboard.py`)
 
 **Key Components**:
-1. **Data Source Selection**: Default vs. custom data upload
-2. **File Upload System**: Multi-file validation and processing
+1. **Data Source**: Uses default Zanzibar data
+2. **Data Processing**: Automatic loading and validation
 3. **Scenario Parameter Controls**: Population growth and efficiency overrides
 4. **Real-time Calculation Engine**: Dynamic model execution
 5. **Interactive Visualization**: Folium-based mapping

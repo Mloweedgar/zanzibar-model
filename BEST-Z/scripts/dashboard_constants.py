@@ -20,14 +20,7 @@ PAGE_CONFIG = {
     "initial_sidebar_state": "expanded"
 }
 
-# Data validation requirements
-CENSUS_REQUIRED_COLUMNS = ['ward_name', 'TOILET', 'SEX', 'AGE']
-SANITATION_REQUIRED_COLUMNS = ['toilet_type_id', 'toilet_type', 'system_category', 'nitrogen_removal_efficiency']
-GEOJSON_REQUIRED_COLUMNS = ['ward_name']
-
-# File upload types
-ALLOWED_CSV_TYPES = ['csv']
-ALLOWED_GEOJSON_TYPES = ['geojson', 'json']
+# Upload-related constants removed as upload functionality is no longer supported
 
 # Tile layer configurations
 TILE_LAYERS = {
@@ -99,57 +92,4 @@ SYSTEM_CATEGORY_NAMES = {
     'open_defecation': 'Open Defecation Toilet Types'
 }
 
-# Template data for file downloads
-SAMPLE_CENSUS_DATA = {
-    'reg_name': ['Sample Region'] * 10,
-    'H_DISTRICT_NAME': ['Sample District'] * 10,
-    'H_COUNCIL_NAME': ['Sample Council'] * 10,
-    'H_CONSTITUENCY_NAME': ['Sample Constituency'] * 10,
-    'H_DIVISION_NAME': ['Sample Division'] * 10,
-    'ward_name': ['Ward A'] * 5 + ['Ward B'] * 5,
-    'H_INSTITUTION_TYPE': [' '] * 10,
-    'TOILET': [1, 2, 3, 4, 5, 1, 2, 3, 4, 5],
-    'SEX': [1, 2, 1, 2, 1, 2, 1, 2, 1, 2],
-    'AGE': [25, 30, 35, 40, 45, 28, 32, 38, 42, 48]
-}
-
-SAMPLE_SANITATION_DATA = {
-    'toilet_type_id': ['1', '2', '3', '4', '5'],
-    'toilet_type': [
-        'Flush to sewer',
-        'Flush to septic tank',
-        'Flush to pit',
-        'Flush elsewhere',
-        'VIP latrine'
-    ],
-    'system_category': [
-        'septic_tank_sewer',
-        'septic_tank',
-        'septic_tank',
-        'septic_tank',
-        'pit_latrine'
-    ],
-    'nitrogen_removal_efficiency': [0.0, 0.0, 0.0, 0.0, 0.0]
-}
-
-SAMPLE_GEOJSON_DATA = {
-    "type": "FeatureCollection",
-    "features": [
-        {
-            "type": "Feature",
-            "properties": {"ward_name": "Ward A"},
-            "geometry": {
-                "type": "Polygon",
-                "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]]
-            }
-        },
-        {
-            "type": "Feature", 
-            "properties": {"ward_name": "Ward B"},
-            "geometry": {
-                "type": "Polygon",
-                "coordinates": [[[1, 0], [2, 0], [2, 1], [1, 1], [1, 0]]]
-            }
-        }
-    ]
-} 
+# Template data constants removed as upload functionality is no longer supported 

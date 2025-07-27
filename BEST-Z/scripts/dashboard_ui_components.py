@@ -9,102 +9,13 @@ from .dashboard_constants import (
 )
 
 
-def create_sidebar_data_source_section():
-    """Create the data source selection section in sidebar."""
-    st.sidebar.header("📁 Data Source")
-    data_source = st.sidebar.radio(
-        "Choose data source:",
-        ["Use Default Data", "Upload Custom Data"],
-        help="Use default Zanzibar data or upload your own files"
-    )
-    return data_source
+# Data source functionality completely removed
 
 
-def create_data_requirements_expander():
-    """Create expandable section showing data format requirements."""
-    with st.sidebar.expander("📋 Required Data Formats"):
-        st.markdown("""
-        **Census Data (CSV):**
-        - ward_name: Ward name
-        - TOILET: Toilet type ID (1-11)
-        - SEX: Gender (1=Male, 2=Female)
-        - AGE: Age in years
-        - H_INSTITUTION_TYPE: Institution type (use ' ' for households)
-        
-        **Sanitation Efficiency (CSV):**
-        - toilet_type_id: Toilet type ID (1-11)
-        - toilet_type: Toilet type name
-        - system_category: System category
-        - nitrogen_removal_efficiency: Efficiency (0-1)
-        
-        **Ward Boundaries (GeoJSON):**
-        - ward_name: Ward name (must match census data)
-        - geometry: Ward polygon geometry
-        """)
+# Upload-related functions removed as upload functionality is no longer supported
 
 
-def create_file_upload_widgets():
-    """Create file upload widgets for custom data."""
-    st.sidebar.subheader("Upload Data Files")
-    
-    census_file = st.sidebar.file_uploader(
-        "Census Data (CSV)",
-        type=['csv'],
-        help="CSV file with columns: ward_name, TOILET, SEX, AGE, H_INSTITUTION_TYPE"
-    )
-    
-    sanitation_file = st.sidebar.file_uploader(
-        "Sanitation Efficiency Data (CSV)",
-        type=['csv'],
-        help="CSV file with columns: toilet_type_id, toilet_type, system_category, nitrogen_removal_efficiency"
-    )
-    
-    geojson_file = st.sidebar.file_uploader(
-        "Ward Boundaries (GeoJSON)",
-        type=['geojson', 'json'],
-        help="GeoJSON file with ward geometries and ward_name column"
-    )
-    
-    return census_file, sanitation_file, geojson_file
-
-
-def create_data_summary_expander(summary):
-    """Create expandable data summary section."""
-    with st.sidebar.expander("📊 Data Summary"):
-        st.write(f"**Census records:** {summary['census_records']:,}")
-        st.write(f"**Toilet types:** {summary['toilet_types']}")
-        st.write(f"**Wards:** {summary['wards_geojson']}")
-        st.write(f"**Unique wards in census:** {summary['unique_wards_census']}")
-
-
-def create_template_download_section(sample_census, sample_sanitation, sample_geojson):
-    """Create section for downloading template files."""
-    if st.button("📥 Download Template Files"):
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.download_button(
-                "Census Template",
-                sample_census.to_csv(index=False),
-                "census_template.csv",
-                "text/csv"
-            )
-        
-        with col2:
-            st.download_button(
-                "Sanitation Template",
-                sample_sanitation.to_csv(index=False),
-                "sanitation_template.csv",
-                "text/csv"
-            )
-        
-        with col3:
-            st.download_button(
-                "GeoJSON Template",
-                json.dumps(sample_geojson, indent=2),
-                "wards_template.geojson",
-                "application/json"
-            )
+# Upload-related UI functions removed as upload functionality is no longer supported
 
 
 def create_preset_scenario_buttons():
