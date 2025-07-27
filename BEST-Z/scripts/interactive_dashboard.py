@@ -10,7 +10,8 @@ try:
     from .dashboard_constants import PAGE_CONFIG
     from .dashboard_data_loader import load_base_data
     from .dashboard_ui_components import (
-        create_preset_scenario_buttons,
+        create_time_slider,
+        create_crisis_metrics,
         create_population_slider,
         create_efficiency_override_sliders,
         create_metrics_row,
@@ -37,7 +38,8 @@ except ImportError:
     from scripts.dashboard_constants import PAGE_CONFIG
     from scripts.dashboard_data_loader import load_base_data
     from scripts.dashboard_ui_components import (
-        create_preset_scenario_buttons,
+        create_time_slider,
+        create_crisis_metrics,
         create_population_slider,
         create_efficiency_override_sliders,
         create_metrics_row,
@@ -77,71 +79,65 @@ def calculate_nitrogen_scenario(pop_df, pop_factor, nre_overrides):
     return gdf
 
 
-def render_pathogen_tab(pop_df):
-    """Render the pathogen analysis tab."""
-    st.header("🦠 Pathogen Contamination Analysis")
-    st.markdown("*Understanding disease risk from sanitation practices*")
+def render_pathogen_tab(pop_df, year, pop_factor):
+    """Render the pathogen analysis tab (car dashboard style)."""
+    st.header("🦠 Pathogen Load")
     
-    # Calculate FIO scenario
-    with st.spinner("Analyzing pathogen contamination..."):
-        fio_ward_data = fio_load.apply_scenario(pop_df, config.FIO_SCENARIOS['baseline_2022'])
+    # Clean crisis metrics - no explanations
+    create_crisis_metrics()
+    
+    # Calculate scenario based on year
+    scenario_key = 'crisis_2025_current' if year <= 2025 else 'crisis_2030_no_action' if year <= 2030 else 'crisis_2050_catastrophic'
+    
+    with st.spinner("Loading..."):
+        fio_ward_data = fio_load.apply_scenario(pop_df, config.FIO_SCENARIOS[scenario_key])
         fio_ward_agg = fio_load.aggregate_ward(fio_ward_data)
         fio_gdf = preprocess.attach_geometry(fio_ward_agg)
         
-        # Get top contamination hot-spots
         od_top_wards = fio_gdf.nlargest(10, 'ward_open_fio_cfu_day')[
             ['ward_name', 'ward_open_fio_cfu_day', 'open_share_percent', 'ward_total_population']
         ].copy()
     
-    # The Story: Public Health Impact
-    st.subheader("🚨 The Public Health Challenge")
-    
+    # Simple metrics
     total_fio = fio_gdf['ward_total_fio_cfu_day'].sum()
     total_open_fio = fio_gdf['ward_open_fio_cfu_day'].sum()
     wards_with_od = (fio_gdf['ward_open_fio_cfu_day'] > 0).sum()
     
-    # Create metrics
-    metrics = [
-        ("Daily Pathogen Load", f"{total_fio:.1e} bacteria/day", "Total disease-causing bacteria released daily across Zanzibar"),
-        ("From Open Defecation", f"{(total_open_fio/total_fio*100):.0f}%", "Percentage of contamination from open defecation (most dangerous)"),
-        ("Wards at Risk", f"{wards_with_od} of {len(fio_gdf)}", "Wards with open defecation contamination")
-    ]
-    create_metrics_row(metrics)
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Daily Load", f"{total_fio:.1e}")
+    with col2:
+        contamination_pct = (total_open_fio/total_fio*100) if total_fio > 0 else 0
+        st.metric("From Open Defecation", f"{contamination_pct:.0f}%")
+    with col3:
+        st.metric("Wards at Risk", f"{wards_with_od}")
     
-    # Key message for decision makers  
-    create_pathogen_key_insights(total_fio, total_open_fio, wards_with_od, len(fio_gdf))
+    # Map stories
+    st.subheader("🗺️ Contamination Map")
     
-    # Interactive Map Story
-    st.subheader("🗺️ Where is the Contamination?")
-    
-    # Map selector with clear stories
     map_story = st.selectbox(
-        "Select contamination story to explore:",
+        "View:",
         [
-            "Show me the disease hot-spots (Open Defecation)",
-            "Show me overall contamination levels", 
-            "Show me intervention priorities"
-        ],
-        help="Each view tells a different story about pathogen contamination risk"
+            "Disease hot-spots",
+            "Overall contamination", 
+            "Priority areas"
+        ]
     )
     
-    # Create appropriate map based on story
-    with st.spinner("Generating contamination map..."):
-        fio_map, description = create_contamination_map(fio_gdf, map_story)
-        st.markdown(description)
-    
-    # Display map
+    with st.spinner("Loading map..."):
+        fio_map, description = create_contamination_map(fio_gdf, f"Show me the {map_story.lower()}")
+        
     st.components.v1.html(fio_map._repr_html_(), height=600)
     
-    # Intervention Impact Modeling
-    od_reduction = create_intervention_impact_section(fio_gdf, od_top_wards)
+    # Simple intervention
+    st.subheader("💡 Impact")
+    od_reduction = st.slider("Open defecation reduction %", 0, 100, 50, 10)
     
     if od_reduction > 0:
-        # Calculate impact
-        scenario_with_reduction = config.FIO_SCENARIOS['baseline_2022'].copy()
+        scenario_with_reduction = config.FIO_SCENARIOS[scenario_key].copy()
         scenario_with_reduction['od_reduction_percent'] = float(od_reduction)
         
-        with st.spinner("Calculating health impact..."):
+        with st.spinner("Calculating..."):
             scenario_fio_data = fio_load.apply_scenario(pop_df, scenario_with_reduction)
             scenario_fio_agg = fio_load.aggregate_ward(scenario_fio_data)
             
@@ -150,25 +146,9 @@ def render_pathogen_tab(pop_df):
             reduction_achieved = baseline_total_od - scenario_total_od
             reduction_percent = (reduction_achieved / baseline_total_od * 100) if baseline_total_od > 0 else 0
         
-        # Show impact in relatable terms
-        impact_metrics = [
-            ("Contamination Reduced", f"{reduction_percent:.0f}%", "Reduction in dangerous pathogen contamination"),
-            ("People Helped", f"~{od_top_wards['ward_total_population'].sum() * (od_reduction/100):,.0f}", "Estimated people who would benefit from improved sanitation"),
-            ("Priority Wards", f"{len(od_top_wards[od_top_wards['open_share_percent'] > 20])}", "High-risk wards that need immediate attention")
-        ]
-        create_metrics_row(impact_metrics)
-        
-        st.success(f"""
-        **Health Impact:** Converting {od_reduction}% of open defecation to basic toilets would reduce dangerous 
-        pathogen contamination by **{reduction_percent:.0f}%**, directly protecting ~**{od_top_wards['ward_total_population'].sum() * (od_reduction/100):,.0f} people** 
-        from water-borne diseases like cholera and diarrhea.
-        """)
+        st.success(f"**{reduction_percent:.0f}%** contamination reduction")
     
-    # Priority Action Table
-    create_priority_wards_table(od_top_wards)
-    
-    # Technical note
-    create_technical_note_expander()
+    create_data_export_section(fio_gdf, pop_factor, "pathogen")
 
 
 def render_nitrogen_tab(pop_df, pop_factor, nre_overrides):
@@ -191,42 +171,36 @@ def render_nitrogen_tab(pop_df, pop_factor, nre_overrides):
     st.components.v1.html(n_map._repr_html_(), height=600)
     
     # Data export section
-    create_data_export_section(n_gdf, pop_factor)
+    create_data_export_section(n_gdf, pop_factor, "nitrogen")
 
 
 def main():
     """Main dashboard application."""
-    st.title("🌊 BEST-Z Model Dashboard")
-    st.markdown("Interactive tool for exploring nitrogen and pathogen load scenarios in Zanzibar")
+    st.title("🌊 BEST-Z Dashboard")
+    st.markdown("Zanzibar contamination analysis")
     
-    # Initialize session state
     initialize_session_state()
     
-    # Load base data (always use default data)
-    with st.spinner("Loading data..."):
+    # Load data
+    with st.spinner("Loading..."):
         pop_df, wards_gdf, toilet_types_df = load_base_data()
     
-    # Sidebar controls
-    st.sidebar.header("🎛️ Scenario Parameters")
+    # Sidebar controls - car dashboard style
+    st.sidebar.header("🎛️ Controls")
     
-    # Preset scenario buttons
-    preset_applied = create_preset_scenario_buttons()
-    if preset_applied:
-        st.session_state.preset_applied = preset_applied
+    # Time slider (replaces preset scenarios)
+    year, pop_factor = create_time_slider()
     
-    # Population growth factor
-    pop_factor = create_population_slider()
-    
-    # Nitrogen removal efficiency overrides
+    # Other controls
     nre_overrides = create_efficiency_override_sliders(
-        toilet_types_df, pop_df, st.session_state.get('preset_applied')
+        toilet_types_df, pop_df, None
     )
     
-    # Create simplified tabs - focus on key stories [[memory:4467168]]
-    tab1, tab2 = st.tabs(["🦠 Pathogen Analysis", "🧪 Nitrogen Analysis"])
+    # Tabs
+    tab1, tab2 = st.tabs(["🦠 Pathogens", "🧪 Nitrogen"])
     
     with tab1:
-        render_pathogen_tab(pop_df)
+        render_pathogen_tab(pop_df, year, pop_factor)
     
     with tab2:
         render_nitrogen_tab(pop_df, pop_factor, nre_overrides)

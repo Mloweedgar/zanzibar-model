@@ -13,17 +13,17 @@ DATA_RAW = ROOT_DIR / 'data_raw'
 OUTPUT_DIR = ROOT_DIR / 'outputs'
 
 SCENARIOS = {
-    'baseline_2022': {
+    'crisis_2025_current': {
         'pop_factor': 1.0,
         'nre_override': {}
     },
-    'improved_removal': {
-        'pop_factor': 1.0,
-        'nre_override': {'1': 0.80, '2': 0.80, '3': 0.80, '4': 0.80}
+    'crisis_2030_no_action': {
+        'pop_factor': 1.25,  # 25% population growth by 2030 (3.7% annual * 8 years ≈ 1.25x)
+        'nre_override': {}   # No improvement in treatment - same 0% removal
     },
-    'pop_growth_2030': {
-        'pop_factor': 1.2,
-        'nre_override': {}
+    'crisis_2050_catastrophic': {
+        'pop_factor': 2.48,  # From report: Stone Town population 219k→544k by 2050
+        'nre_override': {}   # Still no treatment infrastructure - catastrophic
     }
 }
 
@@ -50,21 +50,45 @@ FIO_REMOVAL_EFFICIENCY = {
     'SewerConnection': 0.55
 }
 
-# FIO Scenarios
+# FIO Crisis Scenarios - showing pathogen contamination growth
 FIO_SCENARIOS = {
-    'baseline_2022': {
+    'crisis_2025_current': {
         'pop_factor': 1.0,
         'fio_removal_override': {},
         'od_reduction_percent': 0.0
     },
-    'improved_sanitation': {
-        'pop_factor': 1.0,
-        'fio_removal_override': {'PitLatrine': 0.40, 'SepticTank': 0.40},
-        'od_reduction_percent': 0.0
-    },
-    'reduce_open_defecation_50': {
-        'pop_factor': 1.0,
+    'crisis_2030_no_action': {
+        'pop_factor': 1.25,  # 25% more people, same terrible sanitation
         'fio_removal_override': {},
-        'od_reduction_percent': 50.0
+        'od_reduction_percent': 0.0   # Open defecation stays the same rate
+    },
+    'crisis_2050_catastrophic': {
+        'pop_factor': 2.48,  # Nearly 2.5x more contamination
+        'fio_removal_override': {},
+        'od_reduction_percent': 0.0   # Crisis explodes without intervention
     }
+}
+
+# Real-world contamination data from Zanzibar 2025 Report
+# These values show the actual scale of the contamination crisis
+REAL_WORLD_CONTAMINATION = {
+    'stone_town_port_total_coliform': 11270,  # CFU - highest recorded
+    'stone_town_port_fecal_coliform': 8050,   # CFU - highest recorded  
+    'africa_house_enterococci': 8748,         # CFU - highest recorded
+    'eu_bathing_water_enterococci_limit': 100, # CFU - EU safety standard
+    'untreated_outfalls_count': 27,           # Number of direct ocean discharge points
+    'daily_untreated_discharge_m3': 12000,    # m³/day from 3 major outfalls alone
+    'sewer_coverage_percent': 18,             # Only 18% of urban population connected
+    'open_defecation_percent': 11.7,          # Current prevalence rate
+    'stone_town_population_2022': 219007,     # From census data
+    'total_zanzibar_population_2022': 1889773, # From census data
+    'annual_growth_rate': 3.7,               # Population growth rate %
+}
+
+# Wastewater growth projections from report (m³/day)
+WASTEWATER_PROJECTIONS = {
+    '2025': 111555,
+    '2030': 133777, 
+    '2040': 192384,
+    '2050': 276667
 }
