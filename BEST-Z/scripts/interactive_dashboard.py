@@ -120,6 +120,7 @@ def render_pathogen_tab(pop_df, year, pop_factor, fio_overrides):
     with st.spinner("Loading map..."):
         fio_map, description = create_contamination_map(fio_gdf, f"Show me the {map_story.lower()}")
         
+    # Display map (streamlit will auto-refresh when data changes)
     st.components.v1.html(fio_map._repr_html_(), height=600)
     
     # Simple intervention

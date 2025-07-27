@@ -119,14 +119,37 @@ def create_nitrogen_map(gdf):
 
 
 def create_fio_map(gdf, column, legend_name, colormap='YlOrRd'):
-    """Create folium map with FIO load choropleth."""
+    """Create folium map with FIO load choropleth with dynamic scaling."""
     # Ensure CRS is WGS84 for Folium
     gdf = ensure_wgs84_crs(gdf)
     
     # Create base map
     m = create_base_map()
     
-    # Add choropleth
+    # Get data range for consistent scaling
+    min_val = gdf[column].min()
+    max_val = gdf[column].max()
+    
+    # Create explicit bins for consistent scaling across slider changes
+    if 'log10' in column:
+        # For log scale data, use simple linear bins on the log values
+        if max_val > min_val:
+            bins = np.linspace(min_val * 0.95, max_val * 1.05, 6)  # Add 5% padding
+        else:
+            bins = [min_val - 0.1, min_val + 0.1]
+    elif 'percent' in column:
+        # For percentage data, use fixed 0-100 scale
+        bins = [0, 10, 25, 50, 75, 90, 100]
+    else:
+        # For raw FIO values, use linear bins based on data range
+        if max_val > min_val:
+            range_size = max_val - min_val
+            padding = range_size * 0.05  # 5% padding
+            bins = np.linspace(min_val - padding, max_val + padding, 7)
+        else:
+            bins = [min_val - 0.1, min_val + 0.1]
+    
+    # Add choropleth with explicit bins for consistent visual scaling
     folium.Choropleth(
         geo_data=gdf,
         data=gdf,
@@ -136,7 +159,9 @@ def create_fio_map(gdf, column, legend_name, colormap='YlOrRd'):
         fill_opacity=0.7,
         line_opacity=0.2,
         legend_name=legend_name,
-        name=legend_name
+        name=legend_name,
+        bins=list(bins),  # Ensure bins is a list
+        reset=True  # Force recalculation of scale
     ).add_to(m)
     
     # Add tooltip with FIO data

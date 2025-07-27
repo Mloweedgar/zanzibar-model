@@ -20,35 +20,35 @@ def create_fio_efficiency_sliders():
     # Sewer connections
     sewer_eff = st.sidebar.slider(
         "Sewer Treatment",
-        min_value=0.0,
-        max_value=0.95,
-        value=0.55,  # Default from config
-        step=0.05,
-        format="%.0f%%"
+        min_value=0,
+        max_value=95,
+        value=55,  # Display as percentage
+        step=5,
+        format="%d%%"
     )
-    fio_overrides['SewerConnection'] = sewer_eff
+    fio_overrides['SewerConnection'] = sewer_eff / 100.0  # Convert to decimal for calculations
     
     # Septic tanks
     septic_eff = st.sidebar.slider(
         "Septic Tanks", 
-        min_value=0.0,
-        max_value=0.80,
-        value=0.20,  # Default from config
-        step=0.05,
-        format="%.0f%%"
+        min_value=0,
+        max_value=80,
+        value=20,  # Display as percentage
+        step=5,
+        format="%d%%"
     )
-    fio_overrides['SepticTank'] = septic_eff
+    fio_overrides['SepticTank'] = septic_eff / 100.0  # Convert to decimal for calculations
     
     # Pit latrines
     pit_eff = st.sidebar.slider(
         "Pit Latrines",
-        min_value=0.0, 
-        max_value=0.60,
-        value=0.20,  # Default from config
-        step=0.05,
-        format="%.0f%%"
+        min_value=0, 
+        max_value=60,
+        value=20,  # Display as percentage
+        step=5,
+        format="%d%%"
     )
-    fio_overrides['PitLatrine'] = pit_eff
+    fio_overrides['PitLatrine'] = pit_eff / 100.0  # Convert to decimal for calculations
     
     # Open defecation (always 0%)
     fio_overrides['None'] = 0.0
@@ -61,7 +61,7 @@ def create_time_slider():
     st.sidebar.markdown("**📅 Year**")
     
     year = st.sidebar.slider(
-        "",
+        "Select Year",
         min_value=2025,
         max_value=2050, 
         value=2025,
@@ -532,38 +532,31 @@ def create_data_export_section(gdf, pop_factor, tab_type="nitrogen"):
     """Export data (car dashboard style)."""
     st.subheader("📁 Export")
     
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if tab_type == "nitrogen":
-            if st.button("Download CSV", key=f"{tab_type}_csv"):
-                export_df = gdf.drop(columns=['geometry']).copy()
-                export_df['ward_total_n_load_tonnes'] = export_df['ward_total_n_load_kg'] / 1000
-                
-                csv = export_df.to_csv(index=False)
-                st.download_button(
-                    label="⬇️ CSV",
-                    data=csv,
-                    file_name=f"nitrogen_loads_{pop_factor:.1f}x.csv",
-                    mime="text/csv",
-                    key=f"{tab_type}_download_csv"
-                )
-        else:  # pathogen tab
-            if st.button("Download CSV", key=f"{tab_type}_csv"):
-                export_df = gdf.drop(columns=['geometry']).copy()
-                
-                csv = export_df.to_csv(index=False)
-                st.download_button(
-                    label="⬇️ CSV",
-                    data=csv,
-                    file_name=f"pathogen_loads.csv",
-                    mime="text/csv",
-                    key=f"{tab_type}_download_csv"
-                )
-    
-    with col2:
-        if st.button("Shapefile", key=f"{tab_type}_shp"):
-            st.info("Coming soon")
+    if tab_type == "nitrogen":
+        if st.button("Download CSV", key=f"{tab_type}_csv"):
+            export_df = gdf.drop(columns=['geometry']).copy()
+            export_df['ward_total_n_load_tonnes'] = export_df['ward_total_n_load_kg'] / 1000
+            
+            csv = export_df.to_csv(index=False)
+            st.download_button(
+                label="⬇️ CSV",
+                data=csv,
+                file_name=f"nitrogen_loads_{pop_factor:.1f}x.csv",
+                mime="text/csv",
+                key=f"{tab_type}_download_csv"
+            )
+    else:  # pathogen tab
+        if st.button("Download CSV", key=f"{tab_type}_csv"):
+            export_df = gdf.drop(columns=['geometry']).copy()
+            
+            csv = export_df.to_csv(index=False)
+            st.download_button(
+                label="⬇️ CSV",
+                data=csv,
+                file_name=f"pathogen_loads.csv",
+                mime="text/csv",
+                key=f"{tab_type}_download_csv"
+            )
     
     # Clean stats only
     if tab_type == "nitrogen":
