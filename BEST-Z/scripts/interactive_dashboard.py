@@ -69,9 +69,6 @@ def render_pathogen_tab(pop_df, year, pop_factor, fio_overrides):
     """Render the pathogen analysis tab (car dashboard style)."""
     st.header("🦠 Pathogen Load")
     
-    # Clean crisis metrics - no explanations
-    create_crisis_metrics()
-    
     # Create dynamic scenario based on user inputs
     scenario_key = 'crisis_2025_current' if year <= 2025 else 'crisis_2030_no_action' if year <= 2030 else 'crisis_2050_catastrophic'
     dynamic_scenario = config.FIO_SCENARIOS[scenario_key].copy()
