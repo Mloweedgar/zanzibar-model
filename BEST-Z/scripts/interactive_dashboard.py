@@ -3,6 +3,7 @@
 import streamlit as st
 import pandas as pd
 import geopandas as gpd
+import numpy as np
 import folium
 from folium.plugins import Fullscreen
 import logging
@@ -13,7 +14,7 @@ import io
 
 # Handle imports for both direct execution and module execution
 try:
-    from . import config, ingest, preprocess, n_load
+    from . import config, ingest, preprocess, n_load, fio_load
 except ImportError:
     # If relative imports fail, try absolute imports
     import sys
@@ -24,7 +25,7 @@ except ImportError:
     if str(best_z_dir) not in sys.path:
         sys.path.insert(0, str(best_z_dir))
     
-    from scripts import config, ingest, preprocess, n_load
+    from scripts import config, ingest, preprocess, n_load, fio_load
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
@@ -273,10 +274,136 @@ def create_map(gdf):
     
     return m
 
+
+def create_fio_map(gdf, column, legend_name, colormap='YlOrRd'):
+    """Create folium map with FIO load choropleth."""
+    # Ensure CRS is WGS84 for Folium
+    if gdf.crs and gdf.crs.to_string() != 'EPSG:4326':
+        gdf = gdf.to_crs(epsg=4326)
+    
+    # Create base map
+    m = folium.Map(
+        location=[-6.1659, 39.2026], 
+        zoom_start=10, 
+        control_scale=True
+    )
+    
+    # Add choropleth
+    folium.Choropleth(
+        geo_data=gdf,
+        data=gdf,
+        columns=['ward_name', column],
+        key_on='feature.properties.ward_name',
+        fill_color=colormap,
+        fill_opacity=0.7,
+        line_opacity=0.2,
+        legend_name=legend_name,
+        name=legend_name
+    ).add_to(m)
+    
+    # Add tooltip with FIO data
+    folium.GeoJson(
+        gdf,
+        name='Ward Details',
+        style_function=lambda feature: {
+            'fillColor': 'transparent',
+            'color': 'transparent',
+            'weight': 0,
+            'fillOpacity': 0
+        },
+        tooltip=folium.GeoJsonTooltip(
+            fields=['ward_name', 'ward_total_fio_cfu_day', 'ward_open_fio_cfu_day', 'open_share_percent'],
+            aliases=['Ward:', 'Total FIO Load:', 'Open Def. Load:', 'Open Share (%):'],
+            localize=True,
+            labels=True
+        ),
+        popup=folium.GeoJsonPopup(
+            fields=['ward_name', 'ward_total_fio_cfu_day', 'ward_open_fio_cfu_day', 'open_share_percent', 'ward_total_population'],
+            aliases=['Ward:', 'Total FIO (cfu/day):', 'Open Def. (cfu/day):', 'Open Share (%):', 'Population:'],
+        )
+    ).add_to(m)
+    
+    # Add controls
+    Fullscreen().add_to(m)
+    folium.LayerControl().add_to(m)
+    
+    return m
+
+
+def create_hotspots_map(gdf, top_wards):
+    """Create folium map highlighting open defecation hot-spots."""
+    # Ensure CRS is WGS84 for Folium
+    if gdf.crs and gdf.crs.to_string() != 'EPSG:4326':
+        gdf = gdf.to_crs(epsg=4326)
+    
+    # Create base map
+    m = folium.Map(
+        location=[-6.1659, 39.2026], 
+        zoom_start=10, 
+        control_scale=True
+    )
+    
+    # Add base choropleth for open defecation share
+    folium.Choropleth(
+        geo_data=gdf,
+        data=gdf,
+        columns=['ward_name', 'open_share_percent'],
+        key_on='feature.properties.ward_name',
+        fill_color='Oranges',
+        fill_opacity=0.6,
+        line_opacity=0.2,
+        legend_name='Open Defecation Share (%)',
+        name='All Wards'
+    ).add_to(m)
+    
+    # Highlight top 10 wards with different style
+    top_ward_names = set(top_wards['ward_name'].tolist())
+    
+    def style_function(feature):
+        if feature['properties']['ward_name'] in top_ward_names:
+            return {
+                'fillColor': 'red',
+                'color': 'darkred',
+                'weight': 3,
+                'fillOpacity': 0.8,
+                'dashArray': '5, 5'
+            }
+        else:
+            return {
+                'fillColor': 'transparent',
+                'color': 'transparent',
+                'weight': 0,
+                'fillOpacity': 0
+            }
+    
+    # Add highlighted layer for hot-spots
+    folium.GeoJson(
+        gdf,
+        name='Top 10 Hot-Spots',
+        style_function=style_function,
+        tooltip=folium.GeoJsonTooltip(
+            fields=['ward_name', 'ward_open_fio_cfu_day', 'open_share_percent', 'ward_total_population'],
+            aliases=['Ward:', 'OD Load (cfu/day):', 'OD Share (%):', 'Population:'],
+            localize=True,
+            labels=True
+        ),
+        popup=folium.GeoJsonPopup(
+            fields=['ward_name', 'ward_open_fio_cfu_day', 'open_share_percent', 'ward_total_population'],
+            aliases=['Ward:', 'OD Load (cfu/day):', 'OD Share (%):', 'Population:'],
+        )
+    ).add_to(m)
+    
+    # Add controls
+    Fullscreen().add_to(m)
+    folium.LayerControl().add_to(m)
+    
+    return m
+
+
 def main():
     """Main dashboard application."""
-    st.title("🌊 BEST-Z Nitrogen Model Dashboard")
-    st.markdown("Interactive tool for exploring nitrogen load scenarios in Zanzibar")
+    st.title("🌊 BEST-Z Model Dashboard")
+    st.markdown("Interactive tool for exploring nitrogen and pathogen load scenarios in Zanzibar")
     
     # Data source selection
     st.sidebar.header("📁 Data Source")
@@ -577,100 +704,235 @@ def main():
             for toilet_id in relevant_toilet_ids:
                 nre_overrides[str(toilet_id)] = override_val
     
-    # Calculate scenario
-    with st.spinner("Calculating nitrogen loads..."):
-        gdf = calculate_scenario(pop_df, pop_factor, nre_overrides)
+    # Create simplified tabs - focus on key stories
+    tab1, tab2 = st.tabs(["🦠 Pathogen Analysis", "🧪 Nitrogen Analysis"])
     
-    # Display summary statistics
-    col1, col2, col3, col4 = st.columns(4)
-    
-    total_n_load = gdf['ward_total_n_load_kg'].sum() / 1000  # Convert to tonnes
-    max_ward_load = gdf['ward_total_n_load_kg'].max() / 1000  # Convert to tonnes
-    min_ward_load = gdf['ward_total_n_load_kg'].min() / 1000  # Convert to tonnes
-    avg_ward_load = gdf['ward_total_n_load_kg'].mean() / 1000  # Convert to tonnes
-    
-    col1.metric("Total N Load", f"{total_n_load:,.1f} t/year")
-    col2.metric("Max Ward Load", f"{max_ward_load:,.1f} t/year")
-    col3.metric("Min Ward Load", f"{min_ward_load:,.1f} t/year")
-    col4.metric("Average Ward Load", f"{avg_ward_load:,.1f} t/year")
-
-    
-    # Create and display map
-    with st.spinner("Generating map..."):
-        map_obj = create_map(gdf)
-    
-    # Display map
-    st.subheader("Nitrogen Load Map")
-    st.components.v1.html(map_obj._repr_html_(), height=600)
-    
-    # Data export section
-    st.subheader("Data Export")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if st.button("Download Ward Data (CSV)"):
-            # Prepare data for export with both kg and tonnes
-            export_df = gdf.drop(columns=['geometry']).copy()
-            export_df['ward_total_n_load_tonnes'] = export_df['ward_total_n_load_kg'] / 1000
-            csv = export_df.to_csv(index=False)
-            st.download_button(
-                label="Download CSV",
-                data=csv,
-                file_name=f"nitrogen_load_scenario_{pop_factor}x_pop.csv",
-                mime="text/csv"
-            )
-    
-    with col2:
-        if st.button("Download GeoJSON"):
-            # Include both kg and tonnes in GeoJSON
-            geojson_df = gdf[['ward_name', 'ward_total_n_load_kg', 'ward_total_n_load_tonnes', 'geometry']].copy()
-            geojson = geojson_df.to_json()
-            st.download_button(
-                label="Download GeoJSON",
-                data=geojson,
-                file_name=f"nitrogen_load_scenario_{pop_factor}x_pop.geojson",
-                mime="application/json"
-            )
-    
-    # Display current parameters
-    with st.expander("Current Scenario Parameters"):
-        st.write("**Population Factor:**", pop_factor)
-        st.write("**Nitrogen Removal Efficiency Overrides:**")
-        if nre_overrides:
-            # Group overrides by system category for cleaner display
-            overrides_by_category = {}
-            for toilet_type, efficiency in nre_overrides.items():
-                toilet_info = toilet_types_df[toilet_types_df['toilet_type_id'] == toilet_type]
-                if not toilet_info.empty:
-                    system_category = toilet_info['system_category'].iloc[0]
-                    if system_category not in overrides_by_category:
-                        overrides_by_category[system_category] = []
-                    toilet_name = toilet_info['toilet_type'].iloc[0]
-                    overrides_by_category[system_category].append((toilet_name, efficiency))
+    with tab1:
+        st.header("🦠 Pathogen Contamination Analysis")
+        st.markdown("*Understanding disease risk from sanitation practices*")
+        
+        # Calculate FIO scenario
+        with st.spinner("Analyzing pathogen contamination..."):
+            fio_ward_data = fio_load.apply_scenario(pop_df, config.FIO_SCENARIOS['baseline_2022'])
+            fio_ward_agg = fio_load.aggregate_ward(fio_ward_data)
+            fio_gdf = preprocess.attach_geometry(fio_ward_agg)
             
-            for system_category, toilet_list in overrides_by_category.items():
-                # Create user-friendly category name
-                if system_category == 'septic_tank_sewer':
-                    category_display = "Sewer & Septic Tank Toilet Types"
-                elif system_category == 'septic_tank':
-                    category_display = "Septic Tank Toilet Types"
-                elif system_category == 'pit_latrine':
-                    category_display = "Pit Latrine Toilet Types"
-                elif system_category == 'open_defecation':
-                    category_display = "Open Defecation Toilet Types"
-                else:
-                    category_display = f"{system_category.replace('_', ' ').title()} Toilet Types"
+            # Get top contamination hot-spots
+            od_top_wards = fio_gdf.nlargest(10, 'ward_open_fio_cfu_day')[
+                ['ward_name', 'ward_open_fio_cfu_day', 'open_share_percent', 'ward_total_population']
+            ].copy()
+        
+        # The Story: Public Health Impact
+        st.subheader("🚨 The Public Health Challenge")
+        
+        total_fio = fio_gdf['ward_total_fio_cfu_day'].sum()
+        total_open_fio = fio_gdf['ward_open_fio_cfu_day'].sum()
+        avg_open_share = fio_gdf['open_share_percent'].mean()
+        wards_with_od = (fio_gdf['ward_open_fio_cfu_day'] > 0).sum()
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric(
+                "Daily Pathogen Load", 
+                f"{total_fio:.1e} bacteria/day",
+                help="Total disease-causing bacteria released daily across Zanzibar"
+            )
+        
+        with col2:
+            st.metric(
+                "From Open Defecation", 
+                f"{(total_open_fio/total_fio*100):.0f}%",
+                help="Percentage of contamination from open defecation (most dangerous)"
+            )
+        
+        with col3:
+            st.metric(
+                "Wards at Risk", 
+                f"{wards_with_od} of {len(fio_gdf)}",
+                help="Wards with open defecation contamination"
+            )
+        
+        # Key message for decision makers
+        st.info(f"""
+        **Key Insight for Decision Makers:** Open defecation contributes **{(total_open_fio/total_fio*100):.0f}%** of pathogen contamination 
+        while affecting **{wards_with_od}** wards. This creates direct disease transmission risks through contaminated groundwater and surface runoff.
+        """)
+        
+        # Interactive Map Story
+        st.subheader("🗺️ Where is the Contamination?")
+        
+        # Map selector with clear stories
+        map_story = st.selectbox(
+            "Select contamination story to explore:",
+            [
+                "Show me the disease hot-spots (Open Defecation)",
+                "Show me overall contamination levels", 
+                "Show me intervention priorities"
+            ],
+            help="Each view tells a different story about pathogen contamination risk"
+        )
+        
+        # Create appropriate map based on story
+        with st.spinner("Generating contamination map..."):
+            if "disease hot-spots" in map_story:
+                st.markdown("**🔴 Red areas show highest open defecation contamination = highest disease risk**")
+                fio_map = create_fio_map(fio_gdf, 'open_share_percent', 'Disease Risk: Open Defecation Share (%)', 'Reds')
+            elif "overall contamination" in map_story:
+                st.markdown("**🟠 Darker areas show higher total pathogen loads**")
+                fio_gdf['ward_total_fio_cfu_day_log10'] = np.log10(fio_gdf['ward_total_fio_cfu_day'] + 1)
+                fio_map = create_fio_map(fio_gdf, 'ward_total_fio_cfu_day_log10', 'Total Pathogen Load (Log scale)', 'YlOrRd')
+            else:  # intervention priorities
+                st.markdown("**🎯 Highlighted wards show top 10 priorities for intervention**")
+                fio_map = create_hotspots_map(fio_gdf, od_top_wards)
+        
+        # Display map
+        st.components.v1.html(fio_map._repr_html_(), height=600)
+        
+        # Intervention Impact Modeling
+        st.subheader("💡 Intervention Impact: What if we build toilets?")
+        
+        # Simple scenario modeling
+        od_reduction = st.slider(
+            "If we convert X% of open defecation to basic toilets:",
+            min_value=0,
+            max_value=100,
+            value=50,
+            step=10,
+            help="Model the health impact of providing basic sanitation"
+        )
+        
+        if od_reduction > 0:
+            # Calculate impact
+            scenario_with_reduction = config.FIO_SCENARIOS['baseline_2022'].copy()
+            scenario_with_reduction['od_reduction_percent'] = float(od_reduction)
+            
+            with st.spinner("Calculating health impact..."):
+                scenario_fio_data = fio_load.apply_scenario(pop_df, scenario_with_reduction)
+                scenario_fio_agg = fio_load.aggregate_ward(scenario_fio_data)
                 
-                # Show efficiency (all toilets in category have same efficiency)
-                efficiency = toilet_list[0][1]  # Get efficiency from first toilet
-                st.write(f"- **{category_display}**: {efficiency:.2%}")
-                
-                # Show which specific toilet types are affected
-                for toilet_name, _ in toilet_list:
-                    st.write(f"  • {toilet_name}")
-        else:
-            st.write("- None (using default efficiencies)")
+                baseline_total_od = fio_gdf['ward_open_fio_cfu_day'].sum()
+                scenario_total_od = scenario_fio_agg['ward_open_fio_cfu_day'].sum()
+                reduction_achieved = baseline_total_od - scenario_total_od
+                reduction_percent = (reduction_achieved / baseline_total_od * 100) if baseline_total_od > 0 else 0
+            
+            # Show impact in relatable terms
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric(
+                    "Contamination Reduced", 
+                    f"{reduction_percent:.0f}%",
+                    help="Reduction in dangerous pathogen contamination"
+                )
+            
+            with col2:
+                affected_pop = od_top_wards['ward_total_population'].sum() * (od_reduction/100)
+                st.metric(
+                    "People Helped", 
+                    f"~{affected_pop:,.0f}",
+                    help="Estimated people who would benefit from improved sanitation"
+                )
+            
+            with col3:
+                priority_wards = len(od_top_wards[od_top_wards['open_share_percent'] > 20])
+                st.metric(
+                    "Priority Wards", 
+                    f"{priority_wards}",
+                    help="High-risk wards that need immediate attention"
+                )
+            
+            st.success(f"""
+            **Health Impact:** Converting {od_reduction}% of open defecation to basic toilets would reduce dangerous 
+            pathogen contamination by **{reduction_percent:.0f}%**, directly protecting ~**{affected_pop:,.0f} people** 
+            from water-borne diseases like cholera and diarrhea.
+            """)
+        
+        # Priority Action Table
+        if not od_top_wards.empty and od_top_wards['ward_open_fio_cfu_day'].sum() > 0:
+            st.subheader("🎯 Top Priority Wards for Immediate Action")
+            
+            # Create actionable summary
+            display_df = od_top_wards.head(5).copy()  # Top 5 for focus
+            display_df['ward_open_fio_cfu_day'] = display_df['ward_open_fio_cfu_day'].apply(lambda x: f"{x:.1e}")
+            display_df['open_share_percent'] = display_df['open_share_percent'].apply(lambda x: f"{x:.0f}%")
+            display_df['ward_total_population'] = display_df['ward_total_population'].apply(lambda x: f"{x:,}")
+            display_df.columns = ['Ward Name', 'Disease Risk (pathogens/day)', 'Open Defecation (%)', 'Population at Risk']
+            
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
+            
+            st.info("""
+            **Recommended Action:** Focus sanitation interventions on these 5 wards first. 
+            They have the highest pathogen contamination and would provide maximum health protection per investment.
+            """)
+        
+        # Simple technical note
+        with st.expander("ℹ️ About Pathogen Measurements"):
+            st.markdown("""
+            - **Pathogens** = Disease-causing bacteria (E. coli, faecal coliforms)
+            - **cfu/day** = Colony Forming Units per day (live bacteria released daily)
+            - **Open defecation** contributes 100% of pathogens directly to environment
+            - **Basic toilets** reduce contamination by ~20% through containment
+                         - **Risk areas** = High open defecation % + high population density
+             """)
+    
+    with tab2:
+        st.header("Nitrogen Load Analysis")
+        
+        # Calculate nitrogen scenario
+        with st.spinner("Calculating nitrogen loads..."):
+            n_gdf = calculate_scenario(pop_df, pop_factor, nre_overrides)
+        
+        # Display summary statistics
+        col1, col2, col3, col4 = st.columns(4)
+        
+        total_n_load = n_gdf['ward_total_n_load_kg'].sum() / 1000  # Convert to tonnes
+        max_ward_load = n_gdf['ward_total_n_load_kg'].max() / 1000  # Convert to tonnes
+        min_ward_load = n_gdf['ward_total_n_load_kg'].min() / 1000  # Convert to tonnes
+        avg_ward_load = n_gdf['ward_total_n_load_kg'].mean() / 1000  # Convert to tonnes
+        
+        col1.metric("Total N Load", f"{total_n_load:,.1f} t/year")
+        col2.metric("Max Ward Load", f"{max_ward_load:,.1f} t/year")
+        col3.metric("Min Ward Load", f"{min_ward_load:,.1f} t/year")
+        col4.metric("Average Ward Load", f"{avg_ward_load:,.1f} t/year")
+
+        # Create and display map
+        with st.spinner("Generating nitrogen map..."):
+            n_map = create_map(n_gdf)
+        
+        # Display map
+        st.subheader("Nitrogen Load Map")
+        st.components.v1.html(n_map._repr_html_(), height=600)
+        
+        # Data export section
+        st.subheader("Data Export")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("Download N Ward Data (CSV)", key="n_csv"):
+                # Prepare data for export with both kg and tonnes
+                export_df = n_gdf.drop(columns=['geometry']).copy()
+                export_df['ward_total_n_load_tonnes'] = export_df['ward_total_n_load_kg'] / 1000
+                csv = export_df.to_csv(index=False)
+                st.download_button(
+                    label="Download N CSV",
+                    data=csv,
+                    file_name=f"nitrogen_load_scenario_{pop_factor}x_pop.csv",
+                    mime="text/csv"
+                )
+        
+        with col2:
+            if st.button("Download N GeoJSON", key="n_geojson"):
+                # Include both kg and tonnes in GeoJSON
+                geojson_df = n_gdf[['ward_name', 'ward_total_n_load_kg', 'ward_total_n_load_tonnes', 'geometry']].copy()
+                geojson = geojson_df.to_json()
+                st.download_button(
+                    label="Download N GeoJSON",
+                    data=geojson,
+                    file_name=f"nitrogen_load_scenario_{pop_factor}x_pop.geojson",
+                    mime="application/json"
+                )
 
 if __name__ == "__main__":
     main()
