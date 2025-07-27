@@ -12,15 +12,8 @@ try:
     from .dashboard_ui_components import (
         create_time_slider,
         create_crisis_metrics,
-        create_population_slider,
-        create_efficiency_override_sliders,
-        create_metrics_row,
-        create_pathogen_key_insights,
-        create_intervention_impact_section,
-        create_priority_wards_table,
-        create_nitrogen_summary_metrics,
+        create_fio_efficiency_sliders,
         create_data_export_section,
-        create_technical_note_expander,
         initialize_session_state
     )
     from .dashboard_maps import create_nitrogen_map, create_contamination_map
@@ -40,15 +33,8 @@ except ImportError:
     from scripts.dashboard_ui_components import (
         create_time_slider,
         create_crisis_metrics,
-        create_population_slider,
-        create_efficiency_override_sliders,
-        create_metrics_row,
-        create_pathogen_key_insights,
-        create_intervention_impact_section,
-        create_priority_wards_table,
-        create_nitrogen_summary_metrics,
+        create_fio_efficiency_sliders,
         create_data_export_section,
-        create_technical_note_expander,
         initialize_session_state
     )
     from scripts.dashboard_maps import create_nitrogen_map, create_contamination_map
@@ -79,18 +65,28 @@ def calculate_nitrogen_scenario(pop_df, pop_factor, nre_overrides):
     return gdf
 
 
-def render_pathogen_tab(pop_df, year, pop_factor):
+def render_pathogen_tab(pop_df, year, pop_factor, fio_overrides):
     """Render the pathogen analysis tab (car dashboard style)."""
     st.header("🦠 Pathogen Load")
     
     # Clean crisis metrics - no explanations
     create_crisis_metrics()
     
-    # Calculate scenario based on year
+    # Create dynamic scenario based on user inputs
     scenario_key = 'crisis_2025_current' if year <= 2025 else 'crisis_2030_no_action' if year <= 2030 else 'crisis_2050_catastrophic'
+    dynamic_scenario = config.FIO_SCENARIOS[scenario_key].copy()
+    dynamic_scenario['fio_removal_override'] = fio_overrides
+    
+    # Debug: Show current efficiency values (can remove later)
+    with st.expander("Current Treatment Efficiencies", expanded=False):
+        for sanitation_type, efficiency in fio_overrides.items():
+            st.write(f"{sanitation_type}: {efficiency:.0%}")
+    
+    # Force recalculation when sliders change
+    cache_key = f"{year}_{hash(str(sorted(fio_overrides.items())))}"
     
     with st.spinner("Loading..."):
-        fio_ward_data = fio_load.apply_scenario(pop_df, config.FIO_SCENARIOS[scenario_key])
+        fio_ward_data = fio_load.apply_scenario(pop_df, dynamic_scenario)
         fio_ward_agg = fio_load.aggregate_ward(fio_ward_data)
         fio_gdf = preprocess.attach_geometry(fio_ward_agg)
         
@@ -134,7 +130,7 @@ def render_pathogen_tab(pop_df, year, pop_factor):
     od_reduction = st.slider("Open defecation reduction %", 0, 100, 50, 10)
     
     if od_reduction > 0:
-        scenario_with_reduction = config.FIO_SCENARIOS[scenario_key].copy()
+        scenario_with_reduction = dynamic_scenario.copy()
         scenario_with_reduction['od_reduction_percent'] = float(od_reduction)
         
         with st.spinner("Calculating..."):
@@ -160,7 +156,7 @@ def render_nitrogen_tab(pop_df, pop_factor, nre_overrides):
         n_gdf = calculate_nitrogen_scenario(pop_df, pop_factor, nre_overrides)
     
     # Display summary statistics
-    create_nitrogen_summary_metrics(n_gdf)
+    # create_nitrogen_summary_metrics(n_gdf) # This line is removed as per the edit hint
 
     # Create and display map
     with st.spinner("Generating nitrogen map..."):
@@ -177,7 +173,7 @@ def render_nitrogen_tab(pop_df, pop_factor, nre_overrides):
 def main():
     """Main dashboard application."""
     st.title("🌊 BEST-Z Dashboard")
-    st.markdown("Zanzibar contamination analysis")
+    st.markdown("Zanzibar pathogen contamination analysis")
     
     initialize_session_state()
     
@@ -188,22 +184,14 @@ def main():
     # Sidebar controls - car dashboard style
     st.sidebar.header("🎛️ Controls")
     
-    # Time slider (replaces preset scenarios)
+    # Time slider
     year, pop_factor = create_time_slider()
     
-    # Other controls
-    nre_overrides = create_efficiency_override_sliders(
-        toilet_types_df, pop_df, None
-    )
+    # FIO removal efficiency sliders - these update the map in real-time
+    fio_overrides = create_fio_efficiency_sliders()
     
-    # Tabs
-    tab1, tab2 = st.tabs(["🦠 Pathogens", "🧪 Nitrogen"])
-    
-    with tab1:
-        render_pathogen_tab(pop_df, year, pop_factor)
-    
-    with tab2:
-        render_nitrogen_tab(pop_df, pop_factor, nre_overrides)
+    # Single tab - focus only on pathogens
+    render_pathogen_tab(pop_df, year, pop_factor, fio_overrides)
 
 
 if __name__ == "__main__":

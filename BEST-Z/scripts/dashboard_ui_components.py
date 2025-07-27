@@ -11,17 +11,61 @@ from .dashboard_constants import SYSTEM_CATEGORY_NAMES
 # Upload-related UI functions removed as upload functionality is no longer supported
 
 
+def create_fio_efficiency_sliders():
+    """Create FIO removal efficiency sliders (car dashboard style)."""
+    st.sidebar.markdown("**🚽 Treatment Efficiency**")
+    
+    fio_overrides = {}
+    
+    # Sewer connections
+    sewer_eff = st.sidebar.slider(
+        "Sewer Treatment",
+        min_value=0.0,
+        max_value=0.95,
+        value=0.55,  # Default from config
+        step=0.05,
+        format="%.0f%%"
+    )
+    fio_overrides['SewerConnection'] = sewer_eff
+    
+    # Septic tanks
+    septic_eff = st.sidebar.slider(
+        "Septic Tanks", 
+        min_value=0.0,
+        max_value=0.80,
+        value=0.20,  # Default from config
+        step=0.05,
+        format="%.0f%%"
+    )
+    fio_overrides['SepticTank'] = septic_eff
+    
+    # Pit latrines
+    pit_eff = st.sidebar.slider(
+        "Pit Latrines",
+        min_value=0.0, 
+        max_value=0.60,
+        value=0.20,  # Default from config
+        step=0.05,
+        format="%.0f%%"
+    )
+    fio_overrides['PitLatrine'] = pit_eff
+    
+    # Open defecation (always 0%)
+    fio_overrides['None'] = 0.0
+    
+    return fio_overrides
+
+
 def create_time_slider():
     """Create time slider for crisis progression (car dashboard style)."""
-    st.sidebar.markdown("**📅 Crisis Timeline**")
+    st.sidebar.markdown("**📅 Year**")
     
     year = st.sidebar.slider(
-        "Year",
+        "",
         min_value=2025,
         max_value=2050, 
         value=2025,
-        step=5,
-        help="Show contamination at different years"
+        step=5
     )
     
     # Convert year to population factor based on projections
