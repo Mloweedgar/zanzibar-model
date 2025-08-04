@@ -21,15 +21,14 @@ def main():
     print("Press Ctrl+C to stop the server.")
     
     try:
-        # Run from project root with PYTHONPATH set to include BEST-Z
-        env = os.environ.copy()
-        env['PYTHONPATH'] = str(best_z_dir)
+        # Run using the launcher script that handles imports properly
+        launcher_path = best_z_dir / "dashboard_launcher.py"
         
         subprocess.run([
-            "python", "-m", "streamlit", "run", str(dashboard_path),
+            "python", "-m", "streamlit", "run", str(launcher_path),
             "--server.port", "8501",
             "--server.headless", "false"
-        ], env=env, cwd=project_root)
+        ], cwd=project_root)
     except KeyboardInterrupt:
         print("\n👋 Dashboard stopped.")
     except FileNotFoundError:

@@ -70,12 +70,10 @@ FIO_SCENARIOS = {
 }
 
 # Real-world contamination data from Zanzibar 2025 Report
-# These values show the actual scale of the contamination crisis
 REAL_WORLD_CONTAMINATION = {
     'stone_town_port_total_coliform': 11270,  # CFU - highest recorded
     'stone_town_port_fecal_coliform': 8050,   # CFU - highest recorded  
     'africa_house_enterococci': 8748,         # CFU - highest recorded
-    'eu_bathing_water_enterococci_limit': 100, # CFU - EU safety standard
     'untreated_outfalls_count': 27,           # Number of direct ocean discharge points
     'daily_untreated_discharge_m3': 12000,    # m³/day from 3 major outfalls alone
     'sewer_coverage_percent': 18,             # Only 18% of urban population connected
@@ -83,6 +81,27 @@ REAL_WORLD_CONTAMINATION = {
     'stone_town_population_2022': 219007,     # From census data
     'total_zanzibar_population_2022': 1889773, # From census data
     'annual_growth_rate': 3.7,               # Population growth rate %
+}
+
+# International Reference Standards (Car Dashboard Style - Show Numbers, Let Them Decide)
+REFERENCE_STANDARDS = {
+    # Water Quality References (CFU/100ml)
+    'who_drinking_water_ecoli': 0,           # WHO drinking water guideline
+    'who_recreational_enterococci': 200,     # WHO recreational water guideline  
+    'eu_bathing_water_enterococci': 100,     # EU bathing water directive
+    'us_epa_recreational_enterococci': 104,  # US EPA recreational standard
+    'tanzania_bathing_water_target': 200,    # National target (if available)
+    
+    # Infrastructure References (%)
+    'un_sdg_sanitation_target': 100,         # UN SDG 6.2 - universal sanitation
+    'africa_urban_sewer_average': 30,        # Typical African urban coverage
+    'middle_income_sewer_typical': 60,       # Middle-income country typical
+    'who_basic_sanitation_threshold': 50,    # WHO basic coverage threshold
+    
+    # Treatment References
+    'primary_treatment_removal': 30,         # % pathogen removal - primary treatment
+    'secondary_treatment_removal': 90,       # % pathogen removal - secondary treatment
+    'advanced_treatment_removal': 99,        # % pathogen removal - advanced treatment
 }
 
 # Wastewater growth projections from report (m³/day)

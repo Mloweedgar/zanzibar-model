@@ -7,7 +7,7 @@ import geopandas as gpd
 
 def read_csv(path: Path) -> pd.DataFrame:
     """Read CSV file."""
-    return pd.read_csv(path)
+    return pd.read_csv(path, low_memory=False)
 
 
 def write_csv(df: pd.DataFrame, path: Path) -> None:
