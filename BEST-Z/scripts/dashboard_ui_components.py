@@ -64,6 +64,42 @@ def create_open_defecation_intervention_slider():
     return od_reduction
 
 
+def create_sanitation_upgrade_slider():
+    """Create sanitation infrastructure upgrade slider - pit latrines to septic tanks."""
+    st.sidebar.markdown("**🏗️ Sanitation Infrastructure Upgrade**")
+    
+    infrastructure_upgrade = st.sidebar.slider(
+        "Upgrade pit latrines to septic tanks",
+        min_value=0,
+        max_value=100,
+        value=0,  # Start with no upgrades
+        step=10,
+        format="%d%%",
+        help="Convert basic pit latrines to improved septic tanks (20% → 40% contamination reduction)"
+    )
+    
+    # Visual infrastructure impact indicator
+    if infrastructure_upgrade == 0:
+        infra_icon = "🟤"
+        infra_text = "Basic infrastructure"
+    elif infrastructure_upgrade <= 25:
+        infra_icon = "🟫" 
+        infra_text = "Limited upgrades"
+    elif infrastructure_upgrade <= 50:
+        infra_icon = "🟨"
+        infra_text = "Moderate upgrades"
+    elif infrastructure_upgrade <= 75:
+        infra_icon = "🟩"
+        infra_text = "Major upgrades"
+    else:
+        infra_icon = "✅"
+        infra_text = "Infrastructure modernized"
+    
+    st.sidebar.markdown(f"{infra_icon} **{infra_text}**")
+    
+    return infrastructure_upgrade
+
+
 def create_fio_efficiency_sliders():
     """Create FIO removal efficiency sliders (car dashboard style)."""
     st.sidebar.markdown("**🚽 Treatment Efficiency**")
@@ -86,7 +122,7 @@ def create_fio_efficiency_sliders():
         "Septic Tanks", 
         min_value=0,
         max_value=80,
-        value=20,  # Display as percentage
+        value=40,  # Display as percentage (updated to match new efficiency)
         step=5,
         format="%d%%"
     )
@@ -110,30 +146,54 @@ def create_fio_efficiency_sliders():
 
 
 def create_time_slider():
-    """Create time slider for crisis progression (car dashboard style)."""
-    st.sidebar.markdown("**📅 Year**")
+    """Create time slider showing crisis escalation without intervention."""
+    st.sidebar.markdown("**📅 Crisis Timeline (No Action Scenario)**")
     
     year = st.sidebar.slider(
-        "Select Year",
+        "Project crisis forward",
         min_value=2025,
         max_value=2050, 
         value=2025,
-        step=5
+        step=5,
+        help="See how contamination explodes as population grows with no infrastructure improvements"
     )
     
-    # Convert year to population factor based on projections
+    # Calculate population factor with dramatic crisis progression
     if year == 2025:
         pop_factor = 1.0
-        status = "🟡"
-    elif year <= 2030:
+        crisis_icon = "🟡"
+        crisis_level = "Current crisis"
+        description = "Today's contamination levels"
+    elif year == 2030:
         pop_factor = 1.25
-        status = "🟠" 
+        crisis_icon = "🟠"
+        crisis_level = "Growing crisis"
+        description = "+25% more contamination"
+    elif year == 2035:
+        pop_factor = 1.55
+        crisis_icon = "🔴"
+        crisis_level = "Major crisis"
+        description = "+55% contamination explosion"
+    elif year == 2040:
+        pop_factor = 1.95
+        crisis_icon = "🆘"
+        crisis_level = "Severe crisis"
+        description = "Nearly double contamination"
+    elif year == 2045:
+        pop_factor = 2.2
+        crisis_icon = "💀"
+        crisis_level = "Critical crisis"
+        description = "2.2x contamination disaster"
     else:  # 2050
         pop_factor = 2.48
-        status = "🔴"
+        crisis_icon = "☠️"
+        crisis_level = "CATASTROPHIC CRISIS"
+        description = "2.5x contamination CATASTROPHE"
     
-    # Simple visual indicator
-    st.sidebar.markdown(f"{status} **{year}**: {pop_factor:.1f}x load")
+    # Dramatic visual crisis indicator
+    st.sidebar.markdown(f"{crisis_icon} **{year}**: {crisis_level}")
+    st.sidebar.markdown(f"📈 **{pop_factor:.1f}x contamination**")
+    st.sidebar.caption(f"🚨 {description}")
     
     return year, pop_factor
 

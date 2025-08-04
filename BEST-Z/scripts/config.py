@@ -46,7 +46,7 @@ FIO_SANITATION_MAPPING = {
 FIO_REMOVAL_EFFICIENCY = {
     'None': 0.00,
     'PitLatrine': 0.20,
-    'SepticTank': 0.20,
+    'SepticTank': 0.40,  # Septic tanks more effective than basic pit latrines
     'SewerConnection': 0.55
 }
 

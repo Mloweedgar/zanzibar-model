@@ -50,6 +50,25 @@ def apply_scenario(pop_df: pd.DataFrame, scenario: dict) -> pd.DataFrame:
             # Append converted rows
             df = pd.concat([df, converted_rows], ignore_index=True)
     
+    # Handle infrastructure upgrade scenario (pit latrines to septic tanks)
+    infrastructure_upgrade = scenario.get('infrastructure_upgrade_percent', 0.0) / 100.0
+    if infrastructure_upgrade > 0:
+        # Convert percentage of 'PitLatrine' population to 'SepticTank'
+        pit_mask = df['fio_sanitation_type'] == 'PitLatrine'
+        
+        # Create new rows for upgraded population
+        if pit_mask.any():
+            upgraded_rows = df[pit_mask].copy()
+            upgraded_rows['population'] = upgraded_rows['population'] * infrastructure_upgrade
+            upgraded_rows['fio_sanitation_type'] = 'SepticTank'
+            upgraded_rows['fio_removal_efficiency'] = config.FIO_REMOVAL_EFFICIENCY['SepticTank']
+            
+            # Reduce original pit latrine population
+            df.loc[pit_mask, 'population'] = df.loc[pit_mask, 'population'] * (1 - infrastructure_upgrade)
+            
+            # Append upgraded rows
+            df = pd.concat([df, upgraded_rows], ignore_index=True)
+    
     # Calculate FIO loads (cfu/day)
     df['fio_total_cfu_day'] = (
         df['population'] * config.EFIO * (1 - df['fio_removal_efficiency'])
