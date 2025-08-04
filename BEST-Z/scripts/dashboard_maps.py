@@ -2,7 +2,11 @@
 
 import folium
 from folium.plugins import Fullscreen
+import geopandas as gpd
+import pandas as pd
 import numpy as np
+from pathlib import Path
+from . import config
 from .dashboard_constants import (
     MAP_CENTER, 
     MAP_ZOOM_START, 
@@ -150,7 +154,7 @@ def create_fio_map(gdf, column, legend_name, colormap='YlOrRd'):
             bins = [min_val - 0.1, min_val + 0.1]
     
     # Add choropleth with explicit bins for consistent visual scaling
-    folium.Choropleth(
+    choropleth = folium.Choropleth(
         geo_data=gdf,
         data=gdf,
         columns=['ward_name', column],
@@ -159,10 +163,14 @@ def create_fio_map(gdf, column, legend_name, colormap='YlOrRd'):
         fill_opacity=0.7,
         line_opacity=0.2,
         legend_name=legend_name,
-        name=legend_name,
+        name="📊 Contamination Levels",
         bins=list(bins),  # Ensure bins is a list
         reset=True  # Force recalculation of scale
-    ).add_to(m)
+    )
+    choropleth.add_to(m)
+    
+    # Add toilet types layer
+    m = create_toilet_types_layer(m)
     
     # Add tooltip with FIO data
     folium.GeoJson(
@@ -186,7 +194,7 @@ def create_fio_map(gdf, column, legend_name, colormap='YlOrRd'):
         )
     ).add_to(m)
     
-    # Add controls
+    # Add controls (includes LayerControl)
     add_map_controls(m)
     
     return m
@@ -283,3 +291,122 @@ def create_contamination_map(gdf, map_story):
         fio_map = create_hotspots_map(gdf, od_top_wards)
     
     return fio_map, description 
+
+
+def load_toilet_locations():
+    """Load toilet location data with coordinates."""
+    try:
+        # Load the toilet locations data
+        data_path = Path(__file__).resolve().parents[1] / 'data_raw' / 'toilet_types_locations.csv'
+        df = pd.read_csv(data_path)
+        
+        # Filter out rows without coordinates
+        df = df.dropna(subset=['H_LONGITUDE', 'H_LATITUDE'])
+        
+        # Map toilet text descriptions to specific categories based on actual data
+        def categorize_toilet(toilet_text):
+            toilet_lower = str(toilet_text).lower()
+            
+            # Flush systems (highest treatment potential)
+            if 'piped sewer' in toilet_lower:
+                return {'name': 'Piped Sewer', 'color': '#2E86AB', 'category': 'flush_sewer', 'efficiency': 'high'}
+            elif 'septic tank' in toilet_lower:
+                return {'name': 'Septic Tank', 'color': '#A23B72', 'category': 'flush_septic', 'efficiency': 'medium'}
+            elif 'covered pit' in toilet_lower:
+                return {'name': 'Covered Pit', 'color': '#F18F01', 'category': 'flush_pit', 'efficiency': 'medium'}
+            elif 'somewhere else' in toilet_lower:
+                return {'name': 'No Containment', 'color': '#C73E1D', 'category': 'flush_none', 'efficiency': 'none'}
+            
+            # Dry pit systems (medium treatment)
+            elif 'vip' in toilet_lower or 'ventilated' in toilet_lower:
+                return {'name': 'VIP Latrine', 'color': '#6A994E', 'category': 'pit_vip', 'efficiency': 'medium'}
+            elif 'with lid' in toilet_lower:
+                return {'name': 'Pit + Lid', 'color': '#BC4749', 'category': 'pit_lid', 'efficiency': 'low'}
+            elif 'washable slab without lid' in toilet_lower:
+                return {'name': 'Pit + Slab', 'color': '#F2CC8F', 'category': 'pit_slab', 'efficiency': 'low'}
+            elif 'not-washable' in toilet_lower or 'soil slab' in toilet_lower:
+                return {'name': 'Soil Slab Pit', 'color': '#81B29A', 'category': 'pit_soil', 'efficiency': 'very_low'}
+            elif 'without slab' in toilet_lower or 'open pit' in toilet_lower:
+                return {'name': 'Open Pit', 'color': '#E07A5F', 'category': 'pit_open', 'efficiency': 'very_low'}
+            
+            # No treatment systems
+            elif 'bucket' in toilet_lower:
+                return {'name': 'Bucket', 'color': '#3D5A80', 'category': 'none_bucket', 'efficiency': 'none'}
+            elif any(word in toilet_lower for word in ['no facility', 'bush', 'field', 'beach']):
+                return {'name': 'Open Defecation', 'color': '#ee0000', 'category': 'none_open', 'efficiency': 'none'}
+            else:
+                return {'name': 'Other', 'color': '#666666', 'category': 'unknown', 'efficiency': 'unknown'}
+        
+        # Add toilet type info
+        df['toilet_info'] = df['TOILET'].apply(categorize_toilet)
+        df['toilet_name'] = df['toilet_info'].apply(lambda x: x['name'])
+        df['toilet_color'] = df['toilet_info'].apply(lambda x: x['color'])
+        df['toilet_category'] = df['toilet_info'].apply(lambda x: x['category'])
+        df['toilet_efficiency'] = df['toilet_info'].apply(lambda x: x['efficiency'])
+        
+        return df, None
+        
+    except Exception as e:
+        print(f"Error loading toilet locations: {e}")
+        return None, None
+
+
+def create_toilet_types_layer(m):
+    """Add toilet types point layer to the map."""
+    toilet_df, _ = load_toilet_locations()
+    
+    if toilet_df is None:
+        return m
+    
+    # Sample data if too large (for performance)
+    if len(toilet_df) > 5000:
+        toilet_df = toilet_df.sample(n=5000, random_state=42)
+    
+    # Create feature groups for each toilet category with color indicators
+    feature_groups = {}
+    
+    # Group by efficiency level first, then by specific type
+    efficiency_groups = {
+        'high': {'title': 'High Treatment', 'icon': '🟢'},
+        'medium': {'title': 'Medium Treatment', 'icon': '🟡'}, 
+        'low': {'title': 'Low Treatment', 'icon': '🟠'},
+        'very_low': {'title': 'Very Low Treatment', 'icon': '🔴'},
+        'none': {'title': 'No Treatment', 'icon': '⚫'}
+    }
+    
+    # Get unique combinations of category, name, color, and efficiency
+    unique_types = toilet_df[['toilet_category', 'toilet_name', 'toilet_color', 'toilet_efficiency']].drop_duplicates()
+    
+    for _, row in unique_types.iterrows():
+        if row['toilet_category'] != 'unknown':
+            # Create color swatch HTML
+            color_swatch = f'<span style="display:inline-block;width:12px;height:12px;background-color:{row["toilet_color"]};border:1px solid #000;margin-right:5px;"></span>'
+            efficiency_icon = efficiency_groups.get(row['toilet_efficiency'], {}).get('icon', '⚪')
+            
+            # Create layer name with color indicator and efficiency
+            group_name = f"{efficiency_icon} {color_swatch}{row['toilet_name']}"
+            feature_groups[row['toilet_category']] = folium.FeatureGroup(name=group_name)
+    
+    # Add points to appropriate feature groups
+    for _, row in toilet_df.iterrows():
+        try:
+            category = row['toilet_category']
+            if category in feature_groups:
+                folium.CircleMarker(
+                    location=[row['H_LATITUDE'], row['H_LONGITUDE']],
+                    radius=3,
+                    popup=f"<b>{row['toilet_name']}</b><br/>Ward: {row.get('H_WARD_NAME', 'Unknown')}",
+                    tooltip=row['toilet_name'],
+                    color=row['toilet_color'],
+                    fillColor=row['toilet_color'],
+                    fillOpacity=0.7,
+                    weight=1
+                ).add_to(feature_groups[category])
+        except Exception as e:
+            continue  # Skip problematic rows
+    
+    # Add feature groups to map
+    for group in feature_groups.values():
+        group.add_to(m)
+    
+    return m 
