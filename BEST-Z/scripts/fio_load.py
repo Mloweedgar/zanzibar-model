@@ -26,20 +26,23 @@ def apply_scenario(pop_df: pd.DataFrame, scenario: dict) -> pd.DataFrame:
         config.FIO_REMOVAL_EFFICIENCY
     )
     
-    # Apply treatment infrastructure improvements first
-    treatment_investment = scenario.get('treatment_investment_percent', 0.0) / 100.0
-    if treatment_investment > 0:
-        # Improve septic tank efficiency (40% → 70% max)
-        septic_mask = df['fio_sanitation_type'] == 'SepticTank'
-        base_septic_eff = config.FIO_REMOVAL_EFFICIENCY['SepticTank']
-        improved_septic_eff = base_septic_eff + (0.30 * treatment_investment)  # +30% improvement max
-        df.loc[septic_mask, 'fio_removal_efficiency'] = improved_septic_eff
-        
-        # Improve sewer connection efficiency (55% → 85% max)  
+    # Apply centralized wastewater treatment improvements (affects sewered systems)
+    centralized_treatment = scenario.get('centralized_treatment_percent', 0.0) / 100.0
+    if centralized_treatment > 0:
+        # Improve sewer connection efficiency (55% → 85% max) when treatment plants built
         sewer_mask = df['fio_sanitation_type'] == 'SewerConnection'
         base_sewer_eff = config.FIO_REMOVAL_EFFICIENCY['SewerConnection']
-        improved_sewer_eff = base_sewer_eff + (0.30 * treatment_investment)  # +30% improvement max
+        improved_sewer_eff = base_sewer_eff + (0.30 * centralized_treatment)  # +30% improvement max
         df.loc[sewer_mask, 'fio_removal_efficiency'] = improved_sewer_eff
+    
+    # Apply fecal sludge treatment improvements (affects septic tank systems)
+    fecal_sludge_treatment = scenario.get('fecal_sludge_treatment_percent', 0.0) / 100.0
+    if fecal_sludge_treatment > 0:
+        # Improve septic tank efficiency (40% → 70% max) when proper FSM facilities available
+        septic_mask = df['fio_sanitation_type'] == 'SepticTank'
+        base_septic_eff = config.FIO_REMOVAL_EFFICIENCY['SepticTank']
+        improved_septic_eff = base_septic_eff + (0.30 * fecal_sludge_treatment)  # +30% improvement max
+        df.loc[septic_mask, 'fio_removal_efficiency'] = improved_septic_eff
     
     # Apply manual scenario overrides for removal efficiency (these take precedence)
     for sanitation_type, override_eff in scenario['fio_removal_override'].items():

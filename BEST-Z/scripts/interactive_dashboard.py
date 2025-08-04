@@ -8,7 +8,8 @@ from .dashboard_data_loader import load_base_data
 from .dashboard_ui_components import (
     create_open_defecation_intervention_slider,
     create_sanitation_upgrade_slider,
-    create_treatment_infrastructure_slider,
+    create_centralized_treatment_slider,
+    create_fecal_sludge_treatment_slider,
     create_year_slider,
     create_population_growth_slider,
     initialize_session_state,
@@ -20,7 +21,7 @@ from .dashboard_maps import create_contamination_map, create_fio_map
 st.set_page_config(**PAGE_CONFIG)
 
 
-def render_pathogen_tab(pop_df, year, pop_factor, fio_overrides, od_reduction, infrastructure_upgrade, treatment_investment):
+def render_pathogen_tab(pop_df, year, pop_factor, fio_overrides, od_reduction, infrastructure_upgrade, centralized_treatment, fecal_sludge_treatment):
     """Render the pathogen analysis - MAP FOCUSED."""
     
     # Create dynamic scenario based on user inputs
@@ -37,7 +38,8 @@ def render_pathogen_tab(pop_df, year, pop_factor, fio_overrides, od_reduction, i
     dynamic_scenario['fio_removal_override'] = fio_overrides
     dynamic_scenario['od_reduction_percent'] = od_reduction
     dynamic_scenario['infrastructure_upgrade_percent'] = infrastructure_upgrade
-    dynamic_scenario['treatment_investment_percent'] = treatment_investment
+    dynamic_scenario['centralized_treatment_percent'] = centralized_treatment
+    dynamic_scenario['fecal_sludge_treatment_percent'] = fecal_sludge_treatment
     
     with st.spinner("Loading..."):
         fio_ward_data = fio_load.apply_scenario(pop_df, dynamic_scenario)
@@ -80,8 +82,10 @@ def render_pathogen_tab(pop_df, year, pop_factor, fio_overrides, od_reduction, i
         interventions_active.append(f"OD: {od_reduction}% eliminated")
     if infrastructure_upgrade > 0:
         interventions_active.append(f"Infrastructure: {infrastructure_upgrade}% upgraded")
-    if treatment_investment > 0:
-        interventions_active.append(f"Treatment: {treatment_investment}% built")
+    if centralized_treatment > 0:
+        interventions_active.append(f"Wastewater treatment: {centralized_treatment}% built")
+    if fecal_sludge_treatment > 0:
+        interventions_active.append(f"FSM facilities: {fecal_sludge_treatment}% built")
     
     if interventions_active:
         context_parts.append("Interventions: " + ", ".join(interventions_active))
@@ -124,7 +128,7 @@ def render_pathogen_tab(pop_df, year, pop_factor, fio_overrides, od_reduction, i
 
 def main():
     """Main dashboard application - MAP FOCUSED."""
-    st.title("🗺️ Zanzibar Contamination Map")
+    st.title("BEST-Z Model Dashboard")
     st.markdown("*Interactive pathogen analysis*")
     
     initialize_session_state()
@@ -143,13 +147,14 @@ def main():
     st.sidebar.header("🎯 Interventions")
     od_reduction = create_open_defecation_intervention_slider()
     infrastructure_upgrade = create_sanitation_upgrade_slider()
-    treatment_investment = create_treatment_infrastructure_slider()
+    centralized_treatment = create_centralized_treatment_slider()
+    fecal_sludge_treatment = create_fecal_sludge_treatment_slider()
     
     # Use defaults for removed manual controls
     fio_overrides = {}  # Use default efficiencies
     
     # Main area - pure map focus
-    render_pathogen_tab(pop_df, year, pop_factor, fio_overrides, od_reduction, infrastructure_upgrade, treatment_investment)
+    render_pathogen_tab(pop_df, year, pop_factor, fio_overrides, od_reduction, infrastructure_upgrade, centralized_treatment, fecal_sludge_treatment)
 
 
 if __name__ == "__main__":

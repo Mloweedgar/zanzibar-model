@@ -60,20 +60,38 @@ def create_sanitation_upgrade_slider():
     return infrastructure_upgrade
 
 
-def create_treatment_infrastructure_slider():
-    """Create treatment infrastructure investment slider - improves removal efficiencies."""
-    st.sidebar.markdown("**🏭 Treatment Plants**")
+def create_centralized_treatment_slider():
+    """Create centralized wastewater treatment plants slider - affects sewered systems."""
+    st.sidebar.markdown("**🏭 Centralized Wastewater Treatment**")
     
-    treatment_investment = st.sidebar.slider(
-        "Build treatment plants",
+    centralized_treatment = st.sidebar.slider(
+        "Build wastewater treatment plants",
         min_value=0,
         max_value=100,
         value=0,
         step=10,
-        format="%d%%"
+        format="%d%%",
+        help="Treat sewered wastewater before ocean discharge"
     )
     
-    return treatment_investment
+    return centralized_treatment
+
+
+def create_fecal_sludge_treatment_slider():
+    """Create fecal sludge treatment facilities slider - affects septic tank systems."""
+    st.sidebar.markdown("**🚛 Fecal Sludge Treatment**")
+    
+    fecal_sludge_treatment = st.sidebar.slider(
+        "Build fecal sludge treatment facilities",
+        min_value=0,
+        max_value=100,
+        value=0,
+        step=10,
+        format="%d%%",
+        help="Proper emptying & treatment prevents illegal dumping"
+    )
+    
+    return fecal_sludge_treatment
 
 
 def create_year_slider():
