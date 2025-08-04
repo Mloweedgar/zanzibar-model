@@ -5,6 +5,23 @@ import pandas as pd
 from . import config
 from .dashboard_constants import SYSTEM_CATEGORY_NAMES
 
+
+def format_large_number(value):
+    """Convert large numbers to readable format with K/M/B/T suffixes."""
+    if pd.isna(value) or value == 0:
+        return "0"
+    
+    if abs(value) >= 1e12:
+        return f"{value/1e12:.1f}T"
+    elif abs(value) >= 1e9:
+        return f"{value/1e9:.1f}B"
+    elif abs(value) >= 1e6:
+        return f"{value/1e6:.1f}M"
+    elif abs(value) >= 1e3:
+        return f"{value/1e3:.1f}K"
+    else:
+        return f"{value:.0f}"
+
 # Upload-related functions removed as upload functionality is no longer supported
 
 
@@ -498,7 +515,7 @@ def create_priority_wards_table(od_top_wards):
         
         # Create actionable summary
         display_df = od_top_wards.head(5).copy()  # Top 5 for focus
-        display_df['ward_open_fio_cfu_day'] = display_df['ward_open_fio_cfu_day'].apply(lambda x: f"{x:.1e}")
+        display_df['ward_open_fio_cfu_day'] = display_df['ward_open_fio_cfu_day'].apply(format_large_number)
         display_df['open_share_percent'] = display_df['open_share_percent'].apply(lambda x: f"{x:.0f}%")
         display_df['ward_total_population'] = display_df['ward_total_population'].apply(lambda x: f"{x:,}")
         display_df.columns = ['Ward Name', 'Disease Risk (pathogens/day)', 'Open Defecation (%)', 'Population at Risk']
@@ -564,7 +581,8 @@ def create_data_export_section(gdf, pop_factor, tab_type="nitrogen"):
         st.caption(f"Total: {total_load:.1f} tonnes/year | Factor: {pop_factor:.1f}x | Wards: {len(gdf)}")
     else:
         total_fio = gdf['ward_total_fio_cfu_day'].sum()
-        st.caption(f"Total: {total_fio:.1e} CFU/day | Wards: {len(gdf)}")
+        total_fio_formatted = format_large_number(total_fio)
+        st.caption(f"Total: {total_fio_formatted} CFU/day | Wards: {len(gdf)}")
 
 
 def create_technical_note_expander():

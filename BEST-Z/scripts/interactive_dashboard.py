@@ -8,7 +8,8 @@ from .dashboard_data_loader import load_base_data
 from .dashboard_ui_components import (
     create_time_slider,
     create_fio_efficiency_sliders,
-    initialize_session_state
+    initialize_session_state,
+    format_large_number
 )
 from .dashboard_maps import create_contamination_map, create_fio_map
 
@@ -80,7 +81,8 @@ def render_pathogen_tab(pop_df, year, pop_factor, fio_overrides):
     if "Overall contamination" in map_story:
         total_contamination = fio_gdf['ward_total_fio_cfu_day'].sum()
         highest_ward = fio_gdf.loc[fio_gdf['ward_total_fio_cfu_day'].idxmax(), 'ward_name']
-        st.caption(f"💡 **Island total:** {total_contamination:.1e} CFU daily | **Highest ward:** {highest_ward}")
+        total_formatted = format_large_number(total_contamination)
+        st.caption(f"💡 **Island total:** {total_formatted} CFU daily | **Highest ward:** {highest_ward}")
     elif "Open defecation" in map_story:
         avg_od_percent = fio_gdf['open_share_percent'].mean()
         wards_with_od = (fio_gdf['open_share_percent'] > 0).sum()

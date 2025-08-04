@@ -122,30 +122,68 @@ def create_nitrogen_map(gdf):
     return m
 
 
+def format_large_number(value):
+    """Convert large numbers to readable format with K/M/B/T suffixes."""
+    if pd.isna(value) or value == 0:
+        return "0"
+    
+    if abs(value) >= 1e12:
+        return f"{value/1e12:.1f}T"
+    elif abs(value) >= 1e9:
+        return f"{value/1e9:.1f}B"
+    elif abs(value) >= 1e6:
+        return f"{value/1e6:.1f}M"
+    elif abs(value) >= 1e3:
+        return f"{value/1e3:.1f}K"
+    else:
+        return f"{value:.0f}"
+
 def create_fio_map(gdf, column, legend_name, colormap='YlOrRd'):
     """Create folium map with FIO load choropleth with dynamic scaling."""
     # Ensure CRS is WGS84 for Folium
     gdf = ensure_wgs84_crs(gdf)
     
+    # Add formatted versions of large number columns for tooltips
+    if 'ward_total_fio_cfu_day' in gdf.columns:
+        gdf['total_fio_formatted'] = gdf['ward_total_fio_cfu_day'].apply(format_large_number)
+    if 'ward_open_fio_cfu_day' in gdf.columns:
+        gdf['open_fio_formatted'] = gdf['ward_open_fio_cfu_day'].apply(format_large_number)
+    
     # Create base map
     m = create_base_map()
     
+    # Handle large FIO values by scaling for better legend display
+    display_column = column
+    display_legend_name = legend_name
+    
+    if 'ward_total_fio_cfu_day' == column or 'ward_open_fio_cfu_day' == column:
+        # Scale down large FIO values to billions for cleaner legends
+        scale_factor = 1e9
+        scaled_column = f"{column}_billions"
+        gdf[scaled_column] = gdf[column] / scale_factor
+        display_column = scaled_column
+        # Update legend name to show billions
+        if 'total' in column:
+            display_legend_name = 'Total Contamination (Billions CFU/day)'
+        else:
+            display_legend_name = 'Open Defecation (Billions CFU/day)'
+    
     # Get data range for consistent scaling
-    min_val = gdf[column].min()
-    max_val = gdf[column].max()
+    min_val = gdf[display_column].min()
+    max_val = gdf[display_column].max()
     
     # Create explicit bins for consistent scaling across slider changes
-    if 'log10' in column:
+    if 'log10' in display_column:
         # For log scale data, use simple linear bins on the log values
         if max_val > min_val:
             bins = np.linspace(min_val * 0.95, max_val * 1.05, 6)  # Add 5% padding
         else:
             bins = [min_val - 0.1, min_val + 0.1]
-    elif 'percent' in column:
+    elif 'percent' in display_column:
         # For percentage data, use fixed 0-100 scale
         bins = [0, 10, 25, 50, 75, 90, 100]
     else:
-        # For raw FIO values, use linear bins based on data range
+        # For scaled or raw values, use linear bins based on data range
         if max_val > min_val:
             range_size = max_val - min_val
             padding = range_size * 0.05  # 5% padding
@@ -157,12 +195,12 @@ def create_fio_map(gdf, column, legend_name, colormap='YlOrRd'):
     choropleth = folium.Choropleth(
         geo_data=gdf,
         data=gdf,
-        columns=['ward_name', column],
+        columns=['ward_name', display_column],
         key_on='feature.properties.ward_name',
         fill_color=colormap,
         fill_opacity=0.7,
         line_opacity=0.2,
-        legend_name=legend_name,
+        legend_name=display_legend_name,
         name="📊 Contamination Levels",
         bins=list(bins),  # Ensure bins is a list
         reset=True  # Force recalculation of scale
@@ -183,14 +221,14 @@ def create_fio_map(gdf, column, legend_name, colormap='YlOrRd'):
             'fillOpacity': 0
         },
         tooltip=folium.GeoJsonTooltip(
-            fields=['ward_name', 'ward_total_fio_cfu_day', 'ward_open_fio_cfu_day', 'open_share_percent'],
-            aliases=['Ward:', 'Total FIO Load:', 'Open Def. Load:', 'Open Share (%):'],
+            fields=['ward_name', 'total_fio_formatted', 'open_fio_formatted', 'open_share_percent'],
+            aliases=['Ward:', 'Total Contamination:', 'Open Defecation:', 'Open Share (%):'],
             localize=True,
             labels=True
         ),
         popup=folium.GeoJsonPopup(
-            fields=['ward_name', 'ward_total_fio_cfu_day', 'ward_open_fio_cfu_day', 'open_share_percent', 'ward_total_population'],
-            aliases=['Ward:', 'Total FIO (cfu/day):', 'Open Def. (cfu/day):', 'Open Share (%):', 'Population:'],
+            fields=['ward_name', 'total_fio_formatted', 'open_fio_formatted', 'open_share_percent', 'ward_total_population'],
+            aliases=['Ward:', 'Total Contamination:', 'Open Defecation:', 'Open Share (%):', 'Population:'],
         )
     ).add_to(m)
     
@@ -204,6 +242,9 @@ def create_hotspots_map(gdf, top_wards):
     """Create folium map highlighting open defecation hot-spots."""
     # Ensure CRS is WGS84 for Folium
     gdf = ensure_wgs84_crs(gdf)
+    
+    # Add formatted versions for display
+    gdf['open_fio_formatted'] = gdf['ward_open_fio_cfu_day'].apply(format_large_number)
     
     # Create base map
     m = create_base_map()
@@ -247,14 +288,14 @@ def create_hotspots_map(gdf, top_wards):
         name='Top 10 Hot-Spots',
         style_function=style_function,
         tooltip=folium.GeoJsonTooltip(
-            fields=['ward_name', 'ward_open_fio_cfu_day', 'open_share_percent', 'ward_total_population'],
-            aliases=['Ward:', 'OD Load (cfu/day):', 'OD Share (%):', 'Population:'],
+            fields=['ward_name', 'open_fio_formatted', 'open_share_percent', 'ward_total_population'],
+            aliases=['Ward:', 'OD Contamination:', 'OD Share (%):', 'Population:'],
             localize=True,
             labels=True
         ),
         popup=folium.GeoJsonPopup(
-            fields=['ward_name', 'ward_open_fio_cfu_day', 'open_share_percent', 'ward_total_population'],
-            aliases=['Ward:', 'OD Load (cfu/day):', 'OD Share (%):', 'Population:'],
+            fields=['ward_name', 'open_fio_formatted', 'open_share_percent', 'ward_total_population'],
+            aliases=['Ward:', 'OD Contamination:', 'OD Share (%):', 'Population:'],
         )
     ).add_to(m)
     
