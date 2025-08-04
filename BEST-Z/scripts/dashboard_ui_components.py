@@ -28,6 +28,42 @@ def format_large_number(value):
 # Upload-related UI functions removed as upload functionality is no longer supported
 
 
+def create_open_defecation_intervention_slider():
+    """Create open defecation intervention slider - most impactful control."""
+    st.sidebar.markdown("**🚨 Open Defecation Intervention**")
+    
+    od_reduction = st.sidebar.slider(
+        "Eliminate open defecation in areas",
+        min_value=0,
+        max_value=100,
+        value=0,  # Start with no intervention
+        step=10,
+        format="%d%%",
+        help="Convert open defecation areas to basic pit latrines"
+    )
+    
+    # Visual impact indicator
+    if od_reduction == 0:
+        impact_icon = "🔴"
+        impact_text = "No intervention"
+    elif od_reduction <= 25:
+        impact_icon = "🟠" 
+        impact_text = "Limited impact"
+    elif od_reduction <= 50:
+        impact_icon = "🟡"
+        impact_text = "Moderate improvement"
+    elif od_reduction <= 75:
+        impact_icon = "🟢"
+        impact_text = "Major improvement"
+    else:
+        impact_icon = "✅"
+        impact_text = "Transformative change"
+    
+    st.sidebar.markdown(f"{impact_icon} **{impact_text}**")
+    
+    return od_reduction
+
+
 def create_fio_efficiency_sliders():
     """Create FIO removal efficiency sliders (car dashboard style)."""
     st.sidebar.markdown("**🚽 Treatment Efficiency**")
