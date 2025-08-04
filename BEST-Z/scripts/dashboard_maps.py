@@ -138,7 +138,7 @@ def format_large_number(value):
     else:
         return f"{value:.0f}"
 
-def create_fio_map(gdf, column, legend_name, colormap='YlOrRd'):
+def create_fio_map(gdf, column, legend_name, colormap='YlOrRd', scale_max=5000):
     """Create folium map with FIO load choropleth with dynamic scaling."""
     # Ensure CRS is WGS84 for Folium
     gdf = ensure_wgs84_crs(gdf)
@@ -157,39 +157,58 @@ def create_fio_map(gdf, column, legend_name, colormap='YlOrRd'):
     display_legend_name = legend_name
     
     if 'ward_total_fio_cfu_day' == column or 'ward_open_fio_cfu_day' == column:
-        # Scale down large FIO values to billions for cleaner legends
+        # Scale down large FIO values to fit user-selected range (displayed as 0-scale_max billions)
         scale_factor = 1e9
         scaled_column = f"{column}_billions"
         gdf[scaled_column] = gdf[column] / scale_factor
+        
+        # CLAMP VALUES TO FIT USER-SELECTED RANGE (0-scale_max billions)
+        # This ensures all data fits within our chosen speedometer scale
+        gdf[scaled_column] = gdf[scaled_column].clip(lower=0, upper=scale_max)  # 0 to scale_max billion range
+        
         display_column = scaled_column
         # Update legend name to show billions
         if 'total' in column:
-            display_legend_name = 'Total Contamination (Billions CFU/day)'
+            display_legend_name = f'Total Contamination (0-{scale_max:,} Billions CFU/day)'
         else:
-            display_legend_name = 'Open Defecation (Billions CFU/day)'
+            display_legend_name = f'Open Defecation (0-{scale_max:,} Billions CFU/day)'
     
-    # Get data range for consistent scaling
-    min_val = gdf[display_column].min()
-    max_val = gdf[display_column].max()
-    
-    # Create explicit bins for consistent scaling across slider changes
+    # USER-SELECTABLE SCALE: 0 to scale_max for consistent visual reference like speedometer  
     if 'log10' in display_column:
-        # For log scale data, use simple linear bins on the log values
-        if max_val > min_val:
-            bins = np.linspace(min_val * 0.95, max_val * 1.05, 6)  # Add 5% padding
-        else:
-            bins = [min_val - 0.1, min_val + 0.1]
+        # For log scale data, use appropriate log range
+        bins = [0, 2, 4, 6, 8, 10, 12, 14]  # Log scale from 1 to 10^14
     elif 'percent' in display_column:
-        # For percentage data, use fixed 0-100 scale
-        bins = [0, 10, 25, 50, 75, 90, 100]
+        # For percentage data, use 0-100 scale
+        bins = [0, 5, 10, 20, 30, 50, 70, 90, 100]
+    elif 'billions' in display_column:
+        # DYNAMIC SCALE: 0 to scale_max billion CFU/day based on user selection
+        bins = [0, scale_max*0.05, scale_max*0.1, scale_max*0.2, scale_max*0.4, scale_max*0.6, scale_max*0.8, scale_max]
     else:
-        # For scaled or raw values, use linear bins based on data range
-        if max_val > min_val:
-            range_size = max_val - min_val
-            padding = range_size * 0.05  # 5% padding
-            bins = np.linspace(min_val - padding, max_val + padding, 7)
-        else:
-            bins = [min_val - 0.1, min_val + 0.1]
+        # For raw contamination values - scale based on scale_max (converted from billions)
+        max_raw = scale_max * 1e9  # Convert billions back to raw CFU/day
+        bins = [0, max_raw*0.05, max_raw*0.1, max_raw*0.2, max_raw*0.4, max_raw*0.6, max_raw*0.8, max_raw]
+    
+    # Get actual data range AFTER scaling/clamping to ensure bins cover all values
+    valid_data = gdf[display_column].dropna()
+    
+    # SAFETY: Ensure bins cover all data (especially important after clamping)
+    if len(valid_data) > 0:
+        actual_min = valid_data.min()
+        actual_max = valid_data.max()
+        
+        # Ensure minimum is covered
+        if actual_min < bins[0]:
+            bins[0] = actual_min
+            
+        # Ensure maximum is covered - but limit to scale maximum
+        if actual_max > bins[-1]:
+            if 'billions' in display_column:
+                bins[-1] = min(scale_max, actual_max * 1.01)  # Cap at scale_max billion max
+            else:
+                bins[-1] = actual_max * 1.01  # Small padding for other scales
+    
+    # Ensure bins are properly formatted and sorted
+    bins = sorted([float(b) for b in bins])
     
     # Add choropleth with explicit bins for consistent visual scaling
     choropleth = folium.Choropleth(
@@ -203,6 +222,7 @@ def create_fio_map(gdf, column, legend_name, colormap='YlOrRd'):
         legend_name=display_legend_name,
         name="📊 Contamination Levels",
         bins=list(bins),  # Ensure bins is a list
+        nan_fill_color='lightgray',  # Handle NaN values
         reset=True  # Force recalculation of scale
     )
     choropleth.add_to(m)
@@ -249,7 +269,10 @@ def create_hotspots_map(gdf, top_wards):
     # Create base map
     m = create_base_map()
     
-    # Add base choropleth for open defecation share
+    # Ensure percentage data fits 0-100 range
+    gdf['open_share_percent'] = gdf['open_share_percent'].clip(lower=0, upper=100)
+    
+    # Add base choropleth for open defecation share with fixed 0-100 scale
     folium.Choropleth(
         geo_data=gdf,
         data=gdf,
@@ -258,8 +281,10 @@ def create_hotspots_map(gdf, top_wards):
         fill_color='Oranges',
         fill_opacity=0.6,
         line_opacity=0.2,
-        legend_name='Open Defecation Share (%)',
-        name='All Wards'
+        legend_name='Open Defecation Share (0-100%)',
+        name='All Wards',
+        bins=[0, 5, 10, 20, 30, 50, 70, 90, 100],  # Fixed 0-100 scale for consistency
+        nan_fill_color='lightgray'  # Handle NaN values
     ).add_to(m)
     
     # Highlight top 10 wards with different style

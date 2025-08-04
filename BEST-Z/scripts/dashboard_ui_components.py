@@ -125,6 +125,27 @@ def create_population_growth_slider():
     return pop_factor
 
 
+def create_scale_range_selector():
+    """Create scale range selector for contamination maps."""
+    scale_options = [
+        ("1K Billion", 1000),
+        ("5K Billion", 5000), 
+        ("10K Billion", 10000),
+        ("50K Billion", 50000),
+        ("100K Billion", 100000)
+    ]
+    
+    scale_max = st.selectbox(
+        "📏 Map Scale Range",
+        options=scale_options,
+        index=3,  # Default to 50,000
+        format_func=lambda x: x[0],
+        help="Adjust scale if colors look too uniform or data is cut off"
+    )
+    
+    return scale_max[1]  # Return the numeric value
+
+
 def create_fio_efficiency_sliders():
     """Create FIO removal efficiency sliders (car dashboard style)."""
     st.sidebar.markdown("**🚽 Treatment Efficiency**")

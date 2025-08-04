@@ -12,6 +12,7 @@ from .dashboard_ui_components import (
     create_fecal_sludge_treatment_slider,
     create_year_slider,
     create_population_growth_slider,
+    create_scale_range_selector,
     initialize_session_state,
     format_large_number
 )
@@ -57,14 +58,19 @@ def render_pathogen_tab(pop_df, year, pop_factor, fio_overrides, od_reduction, i
         ]
     )
     
+    # Map scale control - in main content area for direct map relevance
+    col1, col2 = st.columns([1, 3])
+    with col1:
+        scale_max = create_scale_range_selector()
+    
     # Generate simple, powerful map
     with st.spinner("Loading map..."):
         if "Overall contamination" in map_story:
-            fio_map = create_fio_map(fio_gdf, 'ward_total_fio_cfu_day', 'Total Contamination (CFU/day)', 'YlOrRd')
+            fio_map = create_fio_map(fio_gdf, 'ward_total_fio_cfu_day', 'Total Contamination (CFU/day)', 'YlOrRd', scale_max)
             base_description = "**Total daily pathogen load per ward** - Combined contamination from all sources"
             
         else:  # Open defecation
-            fio_map = create_fio_map(fio_gdf, 'open_share_percent', 'Open Defecation Share (%)', 'Reds')
+            fio_map = create_fio_map(fio_gdf, 'open_share_percent', 'Open Defecation Share (%)', 'Reds', scale_max)
             base_description = "**Open defecation impact** - Areas with highest  risk from open defecation"
     
     # Add problem scale and intervention context to description
