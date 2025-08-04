@@ -9,6 +9,8 @@ from .dashboard_ui_components import (
     create_open_defecation_intervention_slider,
     create_sanitation_upgrade_slider,
     create_treatment_infrastructure_slider,
+    create_year_slider,
+    create_population_growth_slider,
     initialize_session_state,
     format_large_number
 )
@@ -63,41 +65,61 @@ def render_pathogen_tab(pop_df, year, pop_factor, fio_overrides, od_reduction, i
             fio_map = create_fio_map(fio_gdf, 'open_share_percent', 'Open Defecation Share (%)', 'Reds')
             base_description = "**Open defecation impact** - Areas with highest  risk from open defecation"
     
-    # Add simple intervention context to description
+    # Add problem scale and intervention context to description
+    context_parts = []
+    
+    # Problem scale context
+    if year > 2025:
+        context_parts.append(f"Year {year}")
+    if pop_factor > 1.0:
+        context_parts.append(f"{pop_factor:.1f}x population")
+    
+    # Intervention context
     interventions_active = []
-    
     if od_reduction > 0:
-        interventions_active.append(f"Open defecation: {od_reduction}% eliminated")
-    
+        interventions_active.append(f"OD: {od_reduction}% eliminated")
     if infrastructure_upgrade > 0:
         interventions_active.append(f"Infrastructure: {infrastructure_upgrade}% upgraded")
-    
     if treatment_investment > 0:
-        interventions_active.append(f"Treatment plants: {treatment_investment}% built")
+        interventions_active.append(f"Treatment: {treatment_investment}% built")
+    
+    if interventions_active:
+        context_parts.append("Interventions: " + ", ".join(interventions_active))
     
     # Build final description
-    if interventions_active:
-        intervention_text = " | ".join(interventions_active)
-        description = f"{base_description} | **Active:** {intervention_text}"
+    if context_parts:
+        context_text = " | ".join(context_parts)
+        description = f"{base_description} | {context_text}"
     else:
         description = base_description
     
-    # Display description
-    st.info(description)
+    # Display with appropriate styling based on problem scale
+    if year >= 2040 or pop_factor >= 2.0:
+        st.error(description)  # Red for severe scenarios
+    elif year >= 2030 or pop_factor >= 1.5:
+        st.warning(description)  # Yellow for moderate scenarios
+    else:
+        st.info(description)  # Blue for current/mild scenarios
     
     # LARGE, CLEAN MAP DISPLAY
     st.components.v1.html(fio_map._repr_html_(), height=700)
     
-    # Simple key insight below map
+    # Simple key insight below map with scenario context
     if "Overall contamination" in map_story:
         total_contamination = fio_gdf['ward_total_fio_cfu_day'].sum()
         highest_ward = fio_gdf.loc[fio_gdf['ward_total_fio_cfu_day'].idxmax(), 'ward_name']
         total_formatted = format_large_number(total_contamination)
-        st.caption(f"**Island total:** {total_formatted} CFU daily | **Highest ward:** {highest_ward}")
+        
+        # Add scenario context
+        scenario_emoji = "💡" if year == 2025 and pop_factor == 1.0 else "📈" if year <= 2030 and pop_factor < 1.5 else "🚨"
+        st.caption(f"{scenario_emoji} **Island total:** {total_formatted} CFU daily | **Highest ward:** {highest_ward}")
     else:  # Open defecation
         avg_od_percent = fio_gdf['open_share_percent'].mean()
         wards_with_od = (fio_gdf['open_share_percent'] > 0).sum()
-        st.caption(f"**Island average:** {avg_od_percent:.1f}% open defecation | **Wards affected:** {wards_with_od}")
+        
+        # Add scenario context
+        scenario_emoji = "💡" if year == 2025 and pop_factor == 1.0 else "📈" if year <= 2030 and pop_factor < 1.5 else "🚨"
+        st.caption(f"{scenario_emoji} **Island average:** {avg_od_percent:.1f}% open defecation | **Wards affected:** {wards_with_od}")
 
 
 def main():
@@ -110,17 +132,20 @@ def main():
     with st.spinner("Loading data..."):
         pop_df, _, _ = load_base_data()
     
-    # Sidebar - clean controls only
-    st.sidebar.header("🎯 Interventions")
+    # Sidebar - organized into problem scale and interventions
     
-    # Only the essential intervention sliders
+    # Problem Scale Section
+    st.sidebar.header("📊 Problem Scale")
+    year = create_year_slider()
+    pop_factor = create_population_growth_slider()
+    
+    # Interventions Section  
+    st.sidebar.header("🎯 Interventions")
     od_reduction = create_open_defecation_intervention_slider()
     infrastructure_upgrade = create_sanitation_upgrade_slider()
     treatment_investment = create_treatment_infrastructure_slider()
     
-    # Use defaults for removed controls
-    year = 2025  # Current year baseline
-    pop_factor = 1.0  # Current population
+    # Use defaults for removed manual controls
     fio_overrides = {}  # Use default efficiencies
     
     # Main area - pure map focus

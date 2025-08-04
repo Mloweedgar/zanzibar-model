@@ -76,6 +76,37 @@ def create_treatment_infrastructure_slider():
     return treatment_investment
 
 
+def create_year_slider():
+    """Create simple year slider to show problem growth over time."""
+    st.sidebar.markdown("**📅 Year**")
+    
+    year = st.sidebar.slider(
+        "Project to year",
+        min_value=2025,
+        max_value=2050,
+        value=2025,
+        step=5
+    )
+    
+    return year
+
+
+def create_population_growth_slider():
+    """Create population growth factor slider."""
+    st.sidebar.markdown("**👥 Population Growth**")
+    
+    pop_factor = st.sidebar.slider(
+        "Population multiplier",
+        min_value=1.0,
+        max_value=3.0,
+        value=1.0,
+        step=0.1,
+        format="%.1fx"
+    )
+    
+    return pop_factor
+
+
 def create_fio_efficiency_sliders():
     """Create FIO removal efficiency sliders (car dashboard style)."""
     st.sidebar.markdown("**🚽 Treatment Efficiency**")
