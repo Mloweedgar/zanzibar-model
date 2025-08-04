@@ -30,74 +30,50 @@ def format_large_number(value):
 
 def create_open_defecation_intervention_slider():
     """Create open defecation intervention slider - most impactful control."""
-    st.sidebar.markdown("**🚨 Open Defecation Intervention**")
+    st.sidebar.markdown("**🚨 Open Defecation Elimination**")
     
     od_reduction = st.sidebar.slider(
-        "Eliminate open defecation in areas",
+        "Eliminate open defecation",
         min_value=0,
         max_value=100,
-        value=0,  # Start with no intervention
+        value=0,
         step=10,
-        format="%d%%",
-        help="Convert open defecation areas to basic pit latrines"
+        format="%d%%"
     )
-    
-    # Visual impact indicator
-    if od_reduction == 0:
-        impact_icon = "🔴"
-        impact_text = "No intervention"
-    elif od_reduction <= 25:
-        impact_icon = "🟠" 
-        impact_text = "Limited impact"
-    elif od_reduction <= 50:
-        impact_icon = "🟡"
-        impact_text = "Moderate improvement"
-    elif od_reduction <= 75:
-        impact_icon = "🟢"
-        impact_text = "Major improvement"
-    else:
-        impact_icon = "✅"
-        impact_text = "Transformative change"
-    
-    st.sidebar.markdown(f"{impact_icon} **{impact_text}**")
     
     return od_reduction
 
 
 def create_sanitation_upgrade_slider():
     """Create sanitation infrastructure upgrade slider - pit latrines to septic tanks."""
-    st.sidebar.markdown("**🏗️ Sanitation Infrastructure Upgrade**")
+    st.sidebar.markdown("**🏗️ Infrastructure Upgrade**")
     
     infrastructure_upgrade = st.sidebar.slider(
         "Upgrade pit latrines to septic tanks",
         min_value=0,
         max_value=100,
-        value=0,  # Start with no upgrades
+        value=0,
         step=10,
-        format="%d%%",
-        help="Convert basic pit latrines to improved septic tanks (20% → 40% contamination reduction)"
+        format="%d%%"
     )
     
-    # Visual infrastructure impact indicator
-    if infrastructure_upgrade == 0:
-        infra_icon = "🟤"
-        infra_text = "Basic infrastructure"
-    elif infrastructure_upgrade <= 25:
-        infra_icon = "🟫" 
-        infra_text = "Limited upgrades"
-    elif infrastructure_upgrade <= 50:
-        infra_icon = "🟨"
-        infra_text = "Moderate upgrades"
-    elif infrastructure_upgrade <= 75:
-        infra_icon = "🟩"
-        infra_text = "Major upgrades"
-    else:
-        infra_icon = "✅"
-        infra_text = "Infrastructure modernized"
-    
-    st.sidebar.markdown(f"{infra_icon} **{infra_text}**")
-    
     return infrastructure_upgrade
+
+
+def create_treatment_infrastructure_slider():
+    """Create treatment infrastructure investment slider - improves removal efficiencies."""
+    st.sidebar.markdown("**🏭 Treatment Plants**")
+    
+    treatment_investment = st.sidebar.slider(
+        "Build treatment plants",
+        min_value=0,
+        max_value=100,
+        value=0,
+        step=10,
+        format="%d%%"
+    )
+    
+    return treatment_investment
 
 
 def create_fio_efficiency_sliders():

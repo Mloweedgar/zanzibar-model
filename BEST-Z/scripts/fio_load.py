@@ -26,7 +26,22 @@ def apply_scenario(pop_df: pd.DataFrame, scenario: dict) -> pd.DataFrame:
         config.FIO_REMOVAL_EFFICIENCY
     )
     
-    # Apply scenario overrides for removal efficiency
+    # Apply treatment infrastructure improvements first
+    treatment_investment = scenario.get('treatment_investment_percent', 0.0) / 100.0
+    if treatment_investment > 0:
+        # Improve septic tank efficiency (40% → 70% max)
+        septic_mask = df['fio_sanitation_type'] == 'SepticTank'
+        base_septic_eff = config.FIO_REMOVAL_EFFICIENCY['SepticTank']
+        improved_septic_eff = base_septic_eff + (0.30 * treatment_investment)  # +30% improvement max
+        df.loc[septic_mask, 'fio_removal_efficiency'] = improved_septic_eff
+        
+        # Improve sewer connection efficiency (55% → 85% max)  
+        sewer_mask = df['fio_sanitation_type'] == 'SewerConnection'
+        base_sewer_eff = config.FIO_REMOVAL_EFFICIENCY['SewerConnection']
+        improved_sewer_eff = base_sewer_eff + (0.30 * treatment_investment)  # +30% improvement max
+        df.loc[sewer_mask, 'fio_removal_efficiency'] = improved_sewer_eff
+    
+    # Apply manual scenario overrides for removal efficiency (these take precedence)
     for sanitation_type, override_eff in scenario['fio_removal_override'].items():
         mask = df['fio_sanitation_type'] == sanitation_type
         df.loc[mask, 'fio_removal_efficiency'] = float(override_eff)
