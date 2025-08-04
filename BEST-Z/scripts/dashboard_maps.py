@@ -365,27 +365,17 @@ def create_toilet_types_layer(m):
     # Create feature groups for each toilet category with color indicators
     feature_groups = {}
     
-    # Group by efficiency level first, then by specific type
-    efficiency_groups = {
-        'high': {'title': 'High Treatment', 'icon': '🟢'},
-        'medium': {'title': 'Medium Treatment', 'icon': '🟡'}, 
-        'low': {'title': 'Low Treatment', 'icon': '🟠'},
-        'very_low': {'title': 'Very Low Treatment', 'icon': '🔴'},
-        'none': {'title': 'No Treatment', 'icon': '⚫'}
-    }
-    
-    # Get unique combinations of category, name, color, and efficiency
-    unique_types = toilet_df[['toilet_category', 'toilet_name', 'toilet_color', 'toilet_efficiency']].drop_duplicates()
+    # Get unique combinations of category, name, and color
+    unique_types = toilet_df[['toilet_category', 'toilet_name', 'toilet_color']].drop_duplicates()
     
     for _, row in unique_types.iterrows():
         if row['toilet_category'] != 'unknown':
             # Create color swatch HTML
             color_swatch = f'<span style="display:inline-block;width:12px;height:12px;background-color:{row["toilet_color"]};border:1px solid #000;margin-right:5px;"></span>'
-            efficiency_icon = efficiency_groups.get(row['toilet_efficiency'], {}).get('icon', '⚪')
             
-            # Create layer name with color indicator and efficiency
-            group_name = f"{efficiency_icon} {color_swatch}{row['toilet_name']}"
-            feature_groups[row['toilet_category']] = folium.FeatureGroup(name=group_name)
+            # Create layer name with color indicator
+            group_name = f"{color_swatch}{row['toilet_name']}"
+            feature_groups[row['toilet_category']] = folium.FeatureGroup(name=group_name, show=False)
     
     # Add points to appropriate feature groups
     for _, row in toilet_df.iterrows():
