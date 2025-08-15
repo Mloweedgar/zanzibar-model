@@ -43,11 +43,15 @@ FIO_SANITATION_MAPPING = {
 }
 
 # FIO Removal Efficiencies by sanitation category
+# ZANZIBAR REALITY: All systems currently have 0% removal efficiency
+# - Pit latrines: Basic containment but significant leakage to groundwater
+# - Septic tanks: Often overflow, not properly maintained, or discharge directly
+# - Sewer connections: No treatment plants - direct discharge via 27 outfalls
 FIO_REMOVAL_EFFICIENCY = {
-    'None': 0.00,
-    'PitLatrine': 0.20,
-    'SepticTank': 0.40,  # Septic tanks more effective than basic pit latrines
-    'SewerConnection': 0.55
+    'None': 0.00,         # Open defecation - direct environmental release
+    'PitLatrine': 0.00,   # Zanzibar reality: significant leakage, no treatment
+    'SepticTank': 0.00,   # Zanzibar reality: overflow/direct discharge common
+    'SewerConnection': 0.00  # Zanzibar reality: no treatment plants, direct ocean discharge
 }
 
 # FIO Crisis Scenarios - showing pathogen contamination growth

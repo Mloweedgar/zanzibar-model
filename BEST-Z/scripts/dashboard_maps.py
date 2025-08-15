@@ -175,18 +175,24 @@ def create_fio_map(gdf, column, legend_name, colormap='YlOrRd', scale_max=5000):
     
     # USER-SELECTABLE SCALE: 0 to scale_max for consistent visual reference like speedometer  
     if 'log10' in display_column:
-        # For log scale data, use appropriate log range
-        bins = [0, 2, 4, 6, 8, 10, 12, 14]  # Log scale from 1 to 10^14
+        # For log scale data, use fewer bins to avoid overlap
+        bins = [0, 3, 6, 9, 12]  # Log scale with cleaner spacing
     elif 'percent' in display_column:
-        # For percentage data, use 0-100 scale
-        bins = [0, 5, 10, 20, 30, 50, 70, 90, 100]
+        # For percentage data, use 0-100 scale with fewer bins to avoid overlap
+        bins = [0, 20, 50, 80, 100]
     elif 'billions' in display_column:
-        # DYNAMIC SCALE: 0 to scale_max billion CFU/day based on user selection
-        bins = [0, scale_max*0.05, scale_max*0.1, scale_max*0.2, scale_max*0.4, scale_max*0.6, scale_max*0.8, scale_max]
+        # DYNAMIC SCALE: 0 to scale_max billion CFU/day with fewer, cleaner bins to avoid overlap
+        if scale_max <= 5000:
+            bins = [0, scale_max*0.2, scale_max*0.5, scale_max*0.8, scale_max]  # 5 bins for small scales
+        else:
+            bins = [0, scale_max*0.1, scale_max*0.3, scale_max*0.6, scale_max]  # 5 bins for large scales
     else:
-        # For raw contamination values - scale based on scale_max (converted from billions)
+        # For raw contamination values - scale based on scale_max with fewer bins to avoid overlap
         max_raw = scale_max * 1e9  # Convert billions back to raw CFU/day
-        bins = [0, max_raw*0.05, max_raw*0.1, max_raw*0.2, max_raw*0.4, max_raw*0.6, max_raw*0.8, max_raw]
+        if scale_max <= 5000:
+            bins = [0, max_raw*0.2, max_raw*0.5, max_raw*0.8, max_raw]  # 5 bins for small scales
+        else:
+            bins = [0, max_raw*0.1, max_raw*0.3, max_raw*0.6, max_raw]  # 5 bins for large scales
     
     # Get actual data range AFTER scaling/clamping to ensure bins cover all values
     valid_data = gdf[display_column].dropna()
@@ -283,7 +289,7 @@ def create_hotspots_map(gdf, top_wards):
         line_opacity=0.2,
         legend_name='Open Defecation Share (0-100%)',
         name='All Wards',
-        bins=[0, 5, 10, 20, 30, 50, 70, 90, 100],  # Fixed 0-100 scale for consistency
+        bins=[0, 20, 50, 80, 100],  # Fixed 0-100 scale with fewer bins to avoid overlap
         nan_fill_color='lightgray'  # Handle NaN values
     ).add_to(m)
     
