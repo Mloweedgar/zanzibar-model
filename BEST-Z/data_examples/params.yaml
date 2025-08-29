@@ -1,0 +1,11 @@
+defaults:
+  pop_per_household: 10
+  efio: 1.0e9
+  eta: 0.5
+  k: 0.7
+  t: 1.0
+  Q: 1.0e7
+  output_unit: CFU_L
+mapping:
+  mode: single
+  synthetic_receptor_id: well_A

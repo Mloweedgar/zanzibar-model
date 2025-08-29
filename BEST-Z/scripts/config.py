@@ -115,3 +115,49 @@ WASTEWATER_PROJECTIONS = {
     '2040': 192384,
     '2050': 276667
 }
+
+# ===================================================================
+# FIO LAYERED MODEL CONFIGURATION
+# ===================================================================
+# Configuration for the three-layer FIO model (Source → Die-off → Receptor)
+
+# Default parameters for FIO layered model
+FIO_LAYERED_DEFAULTS = {
+    # Population and source parameters
+    'pop_per_household': 10,
+    'efio': 1.0e9,  # CFU/person/day - Conservative estimate, can override with config.EFIO
+    'eta': 0.5,     # Removal efficiency fraction (0-1)
+    'lrv': None,    # Log-removal value (overrides eta if provided)
+    
+    # Decay parameters
+    'k': 0.7,       # Time-based decay constant (day⁻¹)
+    'T90': None,    # Time for 1 log reduction (overrides k if provided)
+    'k_s': 0.0,     # Spatial decay constant (m⁻¹)
+    't': 1.0,       # Default travel time (days)
+    
+    # Receptor parameters  
+    'Q': 1.0e7,     # Default receiving water flow (L/day)
+    'output_unit': 'CFU_L',  # CFU_L | CFU_100mL
+}
+
+# Mapping configuration for household → receptor assignment
+FIO_MAPPING_CONFIG = {
+    'mode': 'single',  # single | nearest | round_robin
+    'synthetic_receptor_id': 'well_A',
+}
+
+# Input/output schema definitions for validation
+FIO_INPUT_SCHEMAS = {
+    'households_required': ['household_id'],
+    'households_optional': ['lat', 'lon', 'pop', 'efio', 'eta', 'lrv'],
+    'receptors_required': ['receptor_id'],
+    'receptors_optional': ['Q', 'Q_m3s', 'lat', 'lon'],
+    'mapping_required': ['household_id', 'receptor_id'],
+    'mapping_optional': ['t', 'd'],
+}
+
+# Example configuration combining all parameters
+FIO_LAYERED_EXAMPLE_CONFIG = {
+    'defaults': FIO_LAYERED_DEFAULTS.copy(),
+    'mapping': FIO_MAPPING_CONFIG.copy(),
+}

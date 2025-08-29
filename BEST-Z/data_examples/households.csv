@@ -1,0 +1,4 @@
+household_id,lat,lon,efio,eta,lrv,pop
+H1,,,,,1.0,
+H2,,,,,2.0,
+H3,,,,,,
