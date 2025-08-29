@@ -36,3 +36,5 @@ See [DOCKER_DEPLOYMENT.md](docs/DOCKER_DEPLOYMENT.md) for containerized deployme
 - [User Manual](docs/USER_MANUAL.md) - Complete dashboard guide
 - [Model Implementation Report](docs/BEST-Z_Model_Implementation_Report.md) - Technical details
 - [Enhancement Work Plan](docs/BEST-Z_Enhancement_Work_Plan.md) - Development roadmap
+
+- [FIO Model Expert Validation Guide](docs/FIO_Model_Expert_Validation_Guide.md) - Plain-language formulas, current gaps, and questions for expert review before implementation
