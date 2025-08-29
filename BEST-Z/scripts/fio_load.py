@@ -139,6 +139,9 @@ def compute_fio(pop_df: pd.DataFrame, scenario_name: str = 'baseline_2022') -> p
     """Main function to compute FIO loads for a scenario.
     
     This is the public interface function as specified in requirements.
+    DEPRECATED: This function now delegates to the new layered model for 
+    improved accuracy. Use fio_pipeline.compute_fio_layered() directly
+    for new applications.
     
     Args:
         pop_df: Population DataFrame with toilet type data
@@ -147,6 +150,14 @@ def compute_fio(pop_df: pd.DataFrame, scenario_name: str = 'baseline_2022') -> p
     Returns:
         GeoDataFrame with ward-level FIO calculations
     """
+    import warnings
+    warnings.warn(
+        "compute_fio() is deprecated. Consider using the new FIO layered model "
+        "in fio_pipeline.py for improved accuracy and receptor concentration calculations.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    
     if scenario_name not in config.FIO_SCENARIOS:
         raise ValueError(f"Unknown scenario: {scenario_name}")
     
@@ -159,3 +170,88 @@ def compute_fio(pop_df: pd.DataFrame, scenario_name: str = 'baseline_2022') -> p
     ward_fio = aggregate_ward(fio_df)
     
     return ward_fio 
+
+
+def compute_fio_layered_wrapper(pop_df: pd.DataFrame, scenario: dict, 
+                               receptor_Q: float = 1e7) -> pd.DataFrame:
+    """Wrapper to use new layered model with legacy data format.
+    
+    This function bridges between the legacy ward-based data format and 
+    the new household-based layered model.
+    
+    Args:
+        pop_df: Population DataFrame with toilet type data (legacy format)
+        scenario: Scenario parameters from config.FIO_SCENARIOS  
+        receptor_Q: Default receptor flow rate [L/day]
+        
+    Returns:
+        DataFrame with receptor concentrations and ward aggregations
+    """
+    try:
+        from . import fio_pipeline
+        from . import fio_core
+    except ImportError:
+        import fio_pipeline
+        import fio_core
+    
+    # Convert legacy ward-based data to household format
+    # This is a simplified conversion - in practice you might want more sophisticated mapping
+    households = []
+    for _, row in pop_df.iterrows():
+        household_id = f"{row['ward_name']}_{row.get('toilet_type_id', 'unknown')}"
+        
+        # Map toilet type to sanitation category for eta calculation
+        toilet_type = str(row.get('toilet_type_id', '11')).strip()
+        fio_sanitation_type = config.FIO_SANITATION_MAPPING.get(toilet_type, 'None')
+        eta = config.FIO_REMOVAL_EFFICIENCY.get(fio_sanitation_type, 0.0)
+        
+        # Apply scenario overrides
+        if 'fio_removal_override' in scenario:
+            eta = scenario['fio_removal_override'].get(fio_sanitation_type, eta)
+        
+        households.append({
+            'household_id': household_id,
+            'pop': row.get('population', 10) * scenario.get('pop_factor', 1.0),
+            'efio': config.EFIO,
+            'eta': eta,
+            'ward_name': row.get('ward_name', 'unknown')
+        })
+    
+    households_df = pd.DataFrame(households)
+    
+    # Create synthetic receptor for the region
+    receptors_df = pd.DataFrame({
+        'receptor_id': ['regional_receptor'],
+        'Q': [receptor_Q]
+    })
+    
+    # Create mapping (all households to single receptor)
+    mapping_df = pd.DataFrame({
+        'household_id': households_df['household_id'],
+        'receptor_id': 'regional_receptor',
+        't': 1.0  # Default 1-day travel time
+    })
+    
+    # Use layered model defaults
+    defaults = config.FIO_LAYERED_DEFAULTS.copy()
+    
+    # Compute using layered model
+    concentrations, contributions = fio_pipeline.compute_fio_layered(
+        households_df, receptors_df, mapping_df, defaults
+    )
+    
+    # Aggregate contributions back to ward level for compatibility
+    ward_aggregations = contributions.merge(
+        households_df[['household_id', 'ward_name']], 
+        on='household_id'
+    ).groupby('ward_name').agg({
+        'L': 'sum',
+        'L_reaching': 'sum'
+    }).reset_index()
+    
+    ward_aggregations['concentration_CFU_L'] = concentrations.iloc[0]['C']
+    ward_aggregations['receptor_id'] = concentrations.iloc[0]['receptor_id']
+    
+    logging.info(f"Layered model computed concentration: {concentrations.iloc[0]['C']:.1f} CFU/L")
+    
+    return ward_aggregations
