@@ -5,4 +5,5 @@ __pycache__/
 *$py.class
 .DS_Store
 .vscode
-data/output/
+# Keep data/output/ for deliverables
+# data/output/
