@@ -54,7 +54,7 @@ def standardize_sanitation_table(
 
 def apply_interventions(df: pd.DataFrame, scenario: Dict[str, Any]) -> pd.DataFrame:
     df = df.copy()
-    eff_map: Dict[int, float] = scenario.get('containment_efficiency_override') or config.CONTAINMENT_EFFICIENCY_DEFAULT
+    eff_map: Dict[int, float] = config.CONTAINMENT_EFFICIENCY_DEFAULT
 
     pop_factor = scenario.get('pop_factor', 1.0)
     df['household_population'] = df['household_population'] * pop_factor
@@ -66,7 +66,7 @@ def apply_interventions(df: pd.DataFrame, scenario: Dict[str, Any]) -> pd.DataFr
             converted_rows = df[od_mask].copy()
             converted_rows['household_population'] = converted_rows['household_population'] * od_reduction
             converted_rows['toilet_category_id'] = 3
-            converted_rows['pathogen_containment_efficiency'] = float(eff_map.get(3, 0.90))
+            converted_rows['pathogen_containment_efficiency'] = float(eff_map.get(3, 0.80))
             df.loc[od_mask, 'household_population'] = df.loc[od_mask, 'household_population'] * (1 - od_reduction)
             df = pd.concat([df, converted_rows], ignore_index=True)
 
@@ -81,25 +81,26 @@ def apply_interventions(df: pd.DataFrame, scenario: Dict[str, Any]) -> pd.DataFr
             df.loc[pit_mask, 'household_population'] = df.loc[pit_mask, 'household_population'] * (1 - upgrade_percent)
             df = pd.concat([df, upgraded_rows], ignore_index=True)
 
-    centralized_treatment = float(scenario.get('centralized_treatment_percent', 0.0)) / 100.0
+    centralized_treatment = 1.0 if bool(scenario.get('centralized_treatment_enabled', False)) else 0.0
     if centralized_treatment > 0:
         sewer_mask = df['toilet_category_id'] == 1
         if sewer_mask.any():
-            improved = (
-                df.loc[sewer_mask, 'pathogen_containment_efficiency'] +
-                (1.0 - df.loc[sewer_mask, 'pathogen_containment_efficiency']) * centralized_treatment
-            ).clip(0.0, 1.0)
-            df.loc[sewer_mask, 'pathogen_containment_efficiency'] = improved
+            # Set sewered efficiency to exactly 0.90
+            df.loc[sewer_mask, 'pathogen_containment_efficiency'] = 0.90
 
     fecal_sludge_treatment = float(scenario.get('fecal_sludge_treatment_percent', 0.0)) / 100.0
     if fecal_sludge_treatment > 0:
         septic_mask = df['toilet_category_id'] == 3
         if septic_mask.any():
-            improved = (
-                df.loc[septic_mask, 'pathogen_containment_efficiency'] +
-                (1.0 - df.loc[septic_mask, 'pathogen_containment_efficiency']) * fecal_sludge_treatment
-            ).clip(0.0, 1.0)
-            df.loc[septic_mask, 'pathogen_containment_efficiency'] = improved
+            # Convert the chosen fraction of septic rows below 0.80 to exactly 0.80,
+            # preserving population mass via row splitting (like OD/pit conversions)
+            eligible_mask = septic_mask & (df['pathogen_containment_efficiency'] < 0.80)
+            if eligible_mask.any():
+                converted_rows = df[eligible_mask].copy()
+                converted_rows['household_population'] = converted_rows['household_population'] * fecal_sludge_treatment
+                converted_rows['pathogen_containment_efficiency'] = 0.80
+                df.loc[eligible_mask, 'household_population'] = df.loc[eligible_mask, 'household_population'] * (1 - fecal_sludge_treatment)
+                df = pd.concat([df, converted_rows], ignore_index=True)
 
     df = df[df['household_population'] > 0].reset_index(drop=True)
     logging.info(f"Applied interventions: {len(df)} household records")
@@ -116,13 +117,11 @@ def compute_layer1_loads(df: pd.DataFrame, EFIO: float) -> pd.DataFrame:
     return df
 
 
-def build_or_load_household_tables(scenario: Dict[str, Any]) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    eff_override = scenario.get('containment_efficiency_override')
-    hh_pop_override = scenario.get('household_population_default_override')
+def build_or_load_household_tables(scenario: Dict[str, Any]) -> pd.DataFrame:
     rebuild = bool(scenario.get('rebuild_standardized', False))
 
-    eff_map = eff_override if isinstance(eff_override, dict) else config.CONTAINMENT_EFFICIENCY_DEFAULT
-    hh_default = int(hh_pop_override) if isinstance(hh_pop_override, (int, float)) else config.HOUSEHOLD_POPULATION_DEFAULT
+    eff_map = config.CONTAINMENT_EFFICIENCY_DEFAULT
+    hh_default = config.HOUSEHOLD_POPULATION_DEFAULT
 
     need_build = rebuild or (not config.SANITATION_STANDARDIZED_PATH.exists())
     if not need_build:
@@ -145,5 +144,4 @@ def build_or_load_household_tables(scenario: Dict[str, Any]) -> Tuple[pd.DataFra
     df_with_interventions = apply_interventions(df, scenario)
     EFIO = scenario.get('EFIO_override') or config.EFIO_DEFAULT
     df_with_loads = compute_layer1_loads(df_with_interventions, EFIO)
-    pathogen_load_df = pd.read_csv(config.NET_PATHOGEN_LOAD_PATH)
-    return df_with_loads, pathogen_load_df
+    return df_with_loads
