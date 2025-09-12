@@ -23,6 +23,12 @@ def main() -> int:
     p1.add_argument('--log-level', default='INFO', choices=['DEBUG','INFO','WARNING','ERROR'])
 
     p2 = sub.add_parser('dashboard')
+    p3 = sub.add_parser('inspect-private-q')
+    p4 = sub.add_parser('derive-private-q')
+    p5 = sub.add_parser('derive-government-q')
+    p6 = sub.add_parser('calibrate')
+    p7 = sub.add_parser('calibrate-eff')
+    p8 = sub.add_parser('trend')
 
     args = parser.parse_args()
 
@@ -39,7 +45,40 @@ def main() -> int:
     if args.cmd == 'dashboard':
         # Launch Streamlit by module to ensure package context
         import subprocess
-        subprocess.run([sys.executable, "-m", "streamlit", "run", "app/simple_dashboard.py", "--server.port", "8502"], check=False)
+        subprocess.run([sys.executable, "-m", "streamlit", "run", "app/dashboard.py", "--server.port", "8502"], check=False)
+        return 0
+    if args.cmd == 'inspect-private-q':
+        from app.preprocess_boreholes import extract_private_q_uniques
+        extract_private_q_uniques()
+        print("Saved unique value summaries to data/output/")
+        return 0
+    if args.cmd == 'derive-private-q':
+        from app.preprocess_boreholes import derive_private_Q_L_per_day
+        out = derive_private_Q_L_per_day()
+        print(f"Saved enriched private boreholes to {out}")
+        return 0
+    if args.cmd == 'derive-government-q':
+        from app.preprocess_boreholes import derive_government_Q_L_per_day
+        out = derive_government_Q_L_per_day()
+        print(f"Saved enriched government boreholes to {out}")
+        return 0
+    if args.cmd == 'calibrate':
+        from app.calibrate import run_calibration
+        rep = run_calibration()
+        print("Calibration finished. Best:")
+        print(json.dumps(rep.get('best', {}), indent=2))
+        return 0
+    if args.cmd == 'calibrate-eff':
+        from app.calibrate import run_efficiency_calibration
+        rep = run_efficiency_calibration()
+        print("Efficiency calibration finished. Best:")
+        print(json.dumps(rep.get('best', {}), indent=2))
+        return 0
+    if args.cmd == 'trend':
+        from app.calibrate import run_trend_search
+        rep = run_trend_search()
+        print("Trend search finished. Best by Spearman:")
+        print(json.dumps(rep.get('best_by_spearman', {}), indent=2))
         return 0
     return 1
 

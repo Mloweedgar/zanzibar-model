@@ -4,3 +4,4 @@ matplotlib
 folium
 streamlit
 requests
+scikit-learn
