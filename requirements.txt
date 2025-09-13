@@ -5,3 +5,4 @@ folium
 streamlit
 requests
 scikit-learn
+pydeck
