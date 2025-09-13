@@ -23,8 +23,6 @@ def main() -> int:
     p1.add_argument('--log-level', default='INFO', choices=['DEBUG','INFO','WARNING','ERROR'])
 
     p2 = sub.add_parser('dashboard')
-    p2_enhanced = sub.add_parser('dashboard-enhanced')
-    p2_old = sub.add_parser('dashboard-old')
     p3 = sub.add_parser('inspect-private-q')
     p4 = sub.add_parser('derive-private-q')
     p5 = sub.add_parser('derive-government-q')
@@ -45,19 +43,9 @@ def main() -> int:
         fio_runner.run_scenario(scenario)
         return 0
     if args.cmd == 'dashboard':
-        # Launch lightweight Streamlit dashboard (optimized for <4GB RAM)
+        # Launch optimized Streamlit dashboard
         import subprocess
-        subprocess.run([sys.executable, "-m", "streamlit", "run", "app/lightweight_dashboard.py", "--server.port", "8502"], check=False)
-        return 0
-    if args.cmd == 'dashboard-enhanced':
-        # Launch enhanced Streamlit dashboard (requires more memory)
-        import subprocess
-        subprocess.run([sys.executable, "-m", "streamlit", "run", "app/enhanced_dashboard_full.py", "--server.port", "8504"], check=False)
-        return 0
-    if args.cmd == 'dashboard-old':
-        # Launch original Streamlit dashboard 
-        import subprocess
-        subprocess.run([sys.executable, "-m", "streamlit", "run", "app/dashboard.py", "--server.port", "8503"], check=False)
+        subprocess.run([sys.executable, "-m", "streamlit", "run", "app/dashboard.py", "--server.port", "8502"], check=False)
         return 0
     if args.cmd == 'inspect-private-q':
         from app.preprocess_boreholes import extract_private_q_uniques
