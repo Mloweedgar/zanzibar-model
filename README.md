@@ -43,10 +43,26 @@ Key outputs (written to `data/output/` unless noted):
 - Enriched private boreholes (preprocess step): `data/derived/private_boreholes_enriched.csv`
 
 ### 5) Launch the dashboard
+
+**Lightweight Dashboard (Recommended for <4GB RAM):**
 ```bash
 python man.py dashboard
 ```
-Opens a Streamlit app (defaults to port 8502). Use the sidebar to adjust interventions and rerun.
+Ultra-fast, minimal dashboard optimized for low-resource systems. Shows essential metrics and basic scenario analysis.
+
+**Enhanced Dashboard (4GB+ RAM):**
+```bash
+python man.py dashboard-enhanced  
+```
+Full-featured dashboard with interactive maps, advanced visualizations, and comprehensive reporting.
+
+**Original Dashboard:**
+```bash
+python man.py dashboard-old
+```
+Legacy dashboard for reference.
+
+All dashboards default to different ports (8502, 8504, 8503). Use the sidebar to adjust interventions and rerun scenarios.
 
 ### Notes
 - The pipeline requires:
