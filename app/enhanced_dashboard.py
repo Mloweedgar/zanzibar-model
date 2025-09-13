@@ -19,9 +19,11 @@ from folium.plugins import Fullscreen, HeatMap
 try:
     from app import fio_config as config
     from app import fio_runner
+    from app import scenario_comparison
 except Exception:
     from . import fio_config as config
     from . import fio_runner
+    from . import scenario_comparison
 
 
 def set_page_config():
@@ -468,86 +470,101 @@ def main():
     st.title("🌊 Zanzibar Pathogen Model Dashboard")
     st.markdown("**World Bank Grant: Ocean Health and Sanitation Nexus in Zanzibar**")
     
-    # Create scenario form
-    scenario = create_scenario_form()
+    # Navigation tabs
+    tab1, tab2 = st.tabs(["🎯 Single Scenario", "🔀 Scenario Comparison"])
     
-    # Run scenario button
-    run_button = st.sidebar.button(
-        "🚀 Run Scenario", 
-        type="primary",
-        help="Execute the pathogen model with current parameters"
-    )
-    
-    if run_button:
-        with st.spinner("Running pathogen model... This may take a few minutes."):
-            try:
-                # Save scenario info for TOR compliance
-                scenario['timestamp'] = datetime.datetime.utcnow().isoformat() + 'Z'
-                scenario['run_type'] = 'enhanced_dashboard'
-                
-                fio_runner.run_scenario(scenario)
-                st.success("✅ Scenario completed successfully!")
-                st.experimental_rerun()  # Refresh to show new results
-            except Exception as e:
-                st.error(f"❌ Error running scenario: {str(e)}")
-                st.exception(e)
-    
-    # Load and display results
-    outputs = load_outputs()
-    
-    # Scenario summary
-    display_scenario_summary(scenario)
-    
-    # Results summary
-    display_results_summary(outputs)
-    
-    # Map visualization
-    st.subheader("🗺️ Interactive Map")
-    
-    if not outputs['bh_conc'].empty:
-        heatmap_radius = scenario.get('heatmap_radius', 18)
-        map_obj = create_map(outputs, heatmap_radius)
-        st.components.v1.html(map_obj._repr_html_(), height=600)
+    with tab1:
+        # Create scenario form
+        scenario = create_scenario_form()
         
-        # Data export options
-        st.subheader("📁 Data Export")
-        col1, col2, col3 = st.columns(3)
+        # Run scenario button
+        run_button = st.sidebar.button(
+            "🚀 Run Scenario", 
+            type="primary",
+            help="Execute the pathogen model with current parameters"
+        )
         
-        with col1:
-            if st.button("Download Borehole Results"):
-                csv = outputs['bh_conc'].to_csv(index=False)
-                st.download_button(
-                    label="📊 Borehole Concentrations CSV",
-                    data=csv,
-                    file_name=f"borehole_concentrations_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                    mime='text/csv'
-                )
+        if run_button:
+            with st.spinner("Running pathogen model... This may take a few minutes."):
+                try:
+                    # Save scenario info for TOR compliance
+                    scenario['timestamp'] = datetime.datetime.utcnow().isoformat() + 'Z'
+                    scenario['run_type'] = 'enhanced_dashboard'
+                    
+                    fio_runner.run_scenario(scenario)
+                    st.success("✅ Scenario completed successfully!")
+                    # Use rerun if available, otherwise manual refresh needed
+                    try:
+                        st.rerun()
+                    except AttributeError:
+                        try:
+                            st.experimental_rerun()
+                        except AttributeError:
+                            st.info("Please refresh the page to see updated results.")
+                except Exception as e:
+                    st.error(f"❌ Error running scenario: {str(e)}")
+                    st.exception(e)
         
-        with col2:
-            if st.button("Download Scenario Parameters"):
-                scenario_json = json.dumps(scenario, indent=2)
-                st.download_button(
-                    label="⚙️ Scenario Parameters JSON",
-                    data=scenario_json,
-                    file_name=f"scenario_parameters_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.json",
-                    mime='application/json'
-                )
+        # Load and display results
+        outputs = load_outputs()
         
-        with col3:
-            if st.button("Generate TOR Report"):
-                st.info("📄 Report generation feature coming soon. For now, use the data exports above for manual report preparation.")
+        # Scenario summary
+        display_scenario_summary(scenario)
+        
+        # Results summary
+        display_results_summary(outputs)
+        
+        # Map visualization
+        st.subheader("🗺️ Interactive Map")
+        
+        if not outputs['bh_conc'].empty:
+            heatmap_radius = scenario.get('heatmap_radius', 18)
+            map_obj = create_map(outputs, heatmap_radius)
+            st.components.v1.html(map_obj._repr_html_(), height=600)
+            
+            # Data export options
+            st.subheader("📁 Data Export")
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                if st.button("Download Borehole Results"):
+                    csv = outputs['bh_conc'].to_csv(index=False)
+                    st.download_button(
+                        label="📊 Borehole Concentrations CSV",
+                        data=csv,
+                        file_name=f"borehole_concentrations_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                        mime='text/csv'
+                    )
+            
+            with col2:
+                if st.button("Download Scenario Parameters"):
+                    scenario_json = json.dumps(scenario, indent=2)
+                    st.download_button(
+                        label="⚙️ Scenario Parameters JSON",
+                        data=scenario_json,
+                        file_name=f"scenario_parameters_{datetime.datetime.now().strftime('%Y%m%d_%H%M')}.json",
+                        mime='application/json'
+                    )
+            
+            with col3:
+                if st.button("Generate TOR Report"):
+                    st.info("📄 Report generation feature coming soon. Use Scenario Comparison tab for detailed analysis.")
+        
+        else:
+            st.info("👆 Use the sidebar form to configure and run a scenario to see results.")
+            
+            # Show sample map of Zanzibar
+            sample_map = folium.Map(location=[-6.165, 39.19], zoom_start=10)
+            folium.Marker(
+                [-6.165, 39.19],
+                popup="Zanzibar - Run a scenario to see pathogen modeling results",
+                icon=folium.Icon(color='blue', icon='info-sign')
+            ).add_to(sample_map)
+            st.components.v1.html(sample_map._repr_html_(), height=400)
     
-    else:
-        st.info("👆 Use the sidebar form to configure and run a scenario to see results.")
-        
-        # Show sample map of Zanzibar
-        sample_map = folium.Map(location=[-6.165, 39.19], zoom_start=10)
-        folium.Marker(
-            [-6.165, 39.19],
-            popup="Zanzibar - Run a scenario to see pathogen modeling results",
-            icon=folium.Icon(color='blue', icon='info-sign')
-        ).add_to(sample_map)
-        st.components.v1.html(sample_map._repr_html_(), height=400)
+    with tab2:
+        # Scenario comparison interface
+        scenario_comparison.display_scenario_comparison_ui()
     
     # Footer with TOR information
     st.markdown("---")
