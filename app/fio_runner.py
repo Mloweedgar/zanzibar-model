@@ -71,7 +71,10 @@ def run_scenario(scenario: Union[Dict[str, Any], str] = 'crisis_2025_current') -
     if all_links:
         combined_links = pd.concat(all_links, ignore_index=True)
     else:
-        combined_links = pd.DataFrame(columns=['toilet_id','toilet_lat','toilet_long','borehole_id','borehole_type','distance_m','surviving_fio_load'])
+        combined_links = pd.DataFrame(columns=['toilet_id','toilet_lat','toilet_long','borehole_id','borehole_type','distance_m','surviving_load'])
+    # Rename column to match requirements specification
+    if 'surviving_fio_load' in combined_links.columns:
+        combined_links = combined_links.rename(columns={'surviving_fio_load': 'surviving_load'})
     combined_links.to_csv(config.NET_SURVIVING_PATHOGEN_LOAD_LINKS_PATH, index=False)
 
     # Step 4: Q + Layer 3
@@ -82,7 +85,7 @@ def run_scenario(scenario: Union[Dict[str, Any], str] = 'crisis_2025_current') -
         q_maps.append(government_df[['id','Q_L_per_day']].assign(borehole_type='government'))
     combined_q = pd.concat(q_maps, ignore_index=True) if q_maps else pd.DataFrame(columns=['id','borehole_type','Q_L_per_day'])
 
-    borehole_concentrations = fio_transport.compute_borehole_concentrations(combined_links, combined_q)
+    borehole_concentrations = fio_transport.compute_borehole_concentrations(combined_links, combined_q, private_df, government_df)
 
     # Dashboard exports (include coordinates for markers/heatmaps)
     if not borehole_concentrations.empty:

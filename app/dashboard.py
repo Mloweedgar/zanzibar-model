@@ -233,7 +233,7 @@ def _tunable_controls(base: Dict[str, Any]) -> Dict[str, Any]:
     st.sidebar.caption('Other settings are available under Advanced.')
     with st.sidebar.expander('Advanced system settings'):
         pop_factor = st.number_input('Population factor', min_value=0.1, max_value=5.0, value=float(base.get('pop_factor', 1.0)), step=0.05)
-        ks_per_m = st.number_input('Spatial decay ks (1/m)', min_value=0.0, max_value=0.01, value=float(base.get('ks_per_m', config.KS_PER_M_DEFAULT)), step=0.0005, format='%0.4f')
+        ks_per_m = st.number_input('Spatial decay ks (1/m)', min_value=0.0, max_value=0.10, value=float(base.get('ks_per_m', config.KS_PER_M_DEFAULT)), step=0.005, format='%0.3f')
         rbt = base.get('radius_by_type', config.RADIUS_BY_TYPE_DEFAULT)
         colr1, colr2 = st.columns(2)
         with colr1:
@@ -245,14 +245,14 @@ def _tunable_controls(base: Dict[str, Any]) -> Dict[str, Any]:
         # Q is now provided by enriched CSVs; keep UI minimal and avoid Q overrides
         batch_size = st.number_input('Linking batch size', min_value=100, max_value=20000, value=int(base.get('link_batch_size', 1000)), step=100)
         rebuild = st.checkbox('Rebuild standardized sanitation table from raw this run', value=bool(base.get('rebuild_standardized', False)))
-        eff = config.CONTAINMENT_EFFICIENCY_DEFAULT
+        eff_base = base.get('efficiency_override', config.CONTAINMENT_EFFICIENCY_DEFAULT)
         col_e1, col_e2 = st.columns(2)
         with col_e1:
-            eff1 = st.number_input('Cat 1 efficiency', min_value=0.0, max_value=1.0, value=float(eff.get(1, 0.8)), step=0.05)
-            eff2 = st.number_input('Cat 2 efficiency', min_value=0.0, max_value=1.0, value=float(eff.get(2, 0.2)), step=0.05)
+            eff1 = st.number_input('Cat 1 efficiency', min_value=0.0, max_value=1.0, value=float(eff_base.get(1, 0.50)), step=0.05)
+            eff2 = st.number_input('Cat 2 efficiency', min_value=0.0, max_value=1.0, value=float(eff_base.get(2, 0.10)), step=0.05)
         with col_e2:
-            eff3 = st.number_input('Cat 3 efficiency', min_value=0.0, max_value=1.0, value=float(eff.get(3, 0.9)), step=0.05)
-            eff4 = st.number_input('Cat 4 efficiency', min_value=0.0, max_value=1.0, value=float(eff.get(4, 0.0)), step=0.05)
+            eff3 = st.number_input('Cat 3 efficiency', min_value=0.0, max_value=1.0, value=float(eff_base.get(3, 0.30)), step=0.05)
+            eff4 = st.number_input('Cat 4 efficiency', min_value=0.0, max_value=1.0, value=float(eff_base.get(4, 0.00)), step=0.05)
     scenario = dict(base)
     scenario.update({
         'pop_factor': float(pop_factor),
@@ -263,7 +263,7 @@ def _tunable_controls(base: Dict[str, Any]) -> Dict[str, Any]:
         'fecal_sludge_treatment_percent': float(fecal_sludge),
         'heatmap_radius': int(heat_radius_sidebar),
         'radius_by_type': {'private': int(r_priv), 'government': int(r_gov)},
-        # η override removed to keep configuration simple
+        'efficiency_override': {1: float(eff1), 2: float(eff2), 3: float(eff3), 4: float(eff4)},
         'link_batch_size': int(batch_size),
         'rebuild_standardized': bool(rebuild)
     })

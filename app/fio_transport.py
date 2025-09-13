@@ -110,8 +110,8 @@ def link_sources_to_boreholes(toilets_df: pd.DataFrame, bores_df: pd.DataFrame, 
         base = valid_toilets[['id','lat','long','fio_load']].rename(columns={'id':'toilet_id','lat':'toilet_lat','long':'toilet_long'})
         links_df = adjacency_df.merge(base, on='toilet_id', how='inner')
         links_df['borehole_type'] = borehole_type
-        links_df['surviving_fio_load'] = links_df['fio_load'] * np.exp(-ks_per_m * links_df['distance_m'])
-        return links_df[['toilet_id','toilet_lat','toilet_long','borehole_id','borehole_type','distance_m','surviving_fio_load']]
+        links_df['surviving_load'] = links_df['fio_load'] * np.exp(-ks_per_m * links_df['distance_m'])
+        return links_df[['toilet_id','toilet_lat','toilet_long','borehole_id','borehole_type','distance_m','surviving_load']]
 
     if BallTree is None:
         raise ImportError("scikit-learn is required for fast spatial linking. Please add 'scikit-learn' to requirements and install.")
@@ -167,11 +167,11 @@ def link_sources_to_boreholes(toilets_df: pd.DataFrame, bores_df: pd.DataFrame, 
 
     if not links_records:
         # No links at all (e.g., radius too small) → return an empty, well-typed table
-        return pd.DataFrame(columns=['toilet_id','toilet_lat','toilet_long','borehole_id','borehole_type','distance_m','surviving_fio_load'])
+        return pd.DataFrame(columns=['toilet_id','toilet_lat','toilet_long','borehole_id','borehole_type','distance_m','surviving_load'])
 
     links_df = pd.DataFrame.from_records(
         links_records,
-        columns=['toilet_id','toilet_lat','toilet_long','borehole_id','borehole_type','distance_m','surviving_fio_load']
+        columns=['toilet_id','toilet_lat','toilet_long','borehole_id','borehole_type','distance_m','surviving_load']
     )
     # 5) Optionally save the adjacency cache for faster neighbor lookups next time
     if use_cache and scenario_name and cache_path is not None:
@@ -184,7 +184,7 @@ def link_sources_to_boreholes(toilets_df: pd.DataFrame, bores_df: pd.DataFrame, 
     return links_df
 
 
-def compute_borehole_concentrations(links_df: pd.DataFrame, bh_q_df: pd.DataFrame) -> pd.DataFrame:
+def compute_borehole_concentrations(links_df: pd.DataFrame, bh_q_df: pd.DataFrame, private_df: pd.DataFrame = None, government_df: pd.DataFrame = None) -> pd.DataFrame:
     if links_df.empty:
         raise ValueError("No toilet→borehole links available to compute concentrations. Increase radius or check inputs.")
     # Assume bh_q_df provides ['id','Q_L_per_day']; inner-join to keep matched rows only
@@ -195,13 +195,31 @@ def compute_borehole_concentrations(links_df: pd.DataFrame, bh_q_df: pd.DataFram
     borehole_agg = (
         links_with_Q
         .groupby('borehole_id', as_index=False)
-        .agg({'borehole_type':'first','surviving_fio_load':'sum','Q_L_per_day':'first'})
-        .rename(columns={'surviving_fio_load':'total_surviving_fio_load'})
+        .agg({'borehole_type':'first','surviving_load':'sum','Q_L_per_day':'first'})
+        .rename(columns={'surviving_load':'total_surviving_fio_load'})
     )
     borehole_agg['concentration_CFU_per_100mL'] = (
-        (borehole_agg['total_surviving_fio_load'] / borehole_agg['Q_L_per_day']) / 10.0
+        (borehole_agg['total_surviving_fio_load'] / borehole_agg['Q_L_per_day']) * 100.0
     )
-    borehole_agg[['borehole_id','borehole_type','Q_L_per_day','total_surviving_fio_load','concentration_CFU_per_100mL']].to_csv(
-        config.FIO_CONCENTRATION_AT_BOREHOLES_PATH, index=False
-    )
-    return borehole_agg[['borehole_id','borehole_type','Q_L_per_day','total_surviving_fio_load','concentration_CFU_per_100mL']]
+    
+    # Add lat/long coordinates from borehole dataframes for the main CSV as required by specs
+    if private_df is not None and not private_df.empty:
+        priv_coords = private_df[['id','lat','long']].rename(columns={'id':'borehole_id'})
+        borehole_agg = borehole_agg.merge(priv_coords, on='borehole_id', how='left')
+    if government_df is not None and not government_df.empty:
+        gov_coords = government_df[['id','lat','long']].rename(columns={'id':'borehole_id'})
+        # For rows without lat/long from private, try to get from government
+        missing_coords = borehole_agg['lat'].isna()
+        if missing_coords.any():
+            temp_merge = borehole_agg[missing_coords][['borehole_id']].merge(gov_coords, on='borehole_id', how='left')
+            borehole_agg.loc[missing_coords, ['lat','long']] = temp_merge[['lat','long']].values
+    
+    # Output CSV with all required columns: borehole_id, borehole_type, lat, long, Q_L_per_day, total_surviving_fio_load, concentration_CFU_per_100mL
+    output_cols = ['borehole_id','borehole_type','lat','long','Q_L_per_day','total_surviving_fio_load','concentration_CFU_per_100mL']
+    # Add lat/long columns if missing (should be present from merge above)
+    for col in ['lat', 'long']:
+        if col not in borehole_agg.columns:
+            borehole_agg[col] = np.nan
+    
+    borehole_agg[output_cols].to_csv(config.FIO_CONCENTRATION_AT_BOREHOLES_PATH, index=False)
+    return borehole_agg[output_cols]
