@@ -4,15 +4,15 @@ from pathlib import Path
 from . import config as appcfg
 
 # === CORE PARAMETERS ===
-EFIO_DEFAULT = 1.28e10
+EFIO_DEFAULT = 1.0e7  # Default EFIO per report: 1.0e7 CFU/person/day
 HOUSEHOLD_POPULATION_DEFAULT = 10
-KS_PER_M_DEFAULT = 0.003
+KS_PER_M_DEFAULT = 0.06  # Default ks per report: 0.06 1/m
 
 # === CONTAINMENT EFFICIENCY MAP ===
 CONTAINMENT_EFFICIENCY_DEFAULT = {
-    1: 0.55, # Sewered systems (calibrated)
-    2: 0.15, # Basic pit latrines (calibrated)
-    3: 0.55, # Septic/improved (calibrated)
+    1: 0.50, # Sewered systems - per report default
+    2: 0.10, # Basic pit latrines - per report default  
+    3: 0.30, # Septic/improved - per report default
     4: 0.00  # No containment (open defecation)
 }
 

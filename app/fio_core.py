@@ -54,7 +54,8 @@ def standardize_sanitation_table(
 
 def apply_interventions(df: pd.DataFrame, scenario: Dict[str, Any]) -> pd.DataFrame:
     df = df.copy()
-    eff_map: Dict[int, float] = config.CONTAINMENT_EFFICIENCY_DEFAULT
+    # Use scenario efficiency override if provided, otherwise use defaults
+    eff_map: Dict[int, float] = scenario.get('efficiency_override', config.CONTAINMENT_EFFICIENCY_DEFAULT)
 
     pop_factor = scenario.get('pop_factor', 1.0)
     df['household_population'] = df['household_population'] * pop_factor
@@ -120,7 +121,7 @@ def compute_layer1_loads(df: pd.DataFrame, EFIO: float) -> pd.DataFrame:
 def build_or_load_household_tables(scenario: Dict[str, Any]) -> pd.DataFrame:
     rebuild = bool(scenario.get('rebuild_standardized', False))
 
-    eff_map = config.CONTAINMENT_EFFICIENCY_DEFAULT
+    eff_map = scenario.get('efficiency_override', config.CONTAINMENT_EFFICIENCY_DEFAULT)
     hh_default = config.HOUSEHOLD_POPULATION_DEFAULT
 
     need_build = rebuild or (not config.SANITATION_STANDARDIZED_PATH.exists())
