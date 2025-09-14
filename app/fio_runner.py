@@ -24,12 +24,17 @@ def run_scenario(scenario: Union[Dict[str, Any], str] = 'crisis_2025_current') -
         scenario_name = scenario
     else:
         scenario_dict = scenario
-        scenario_name = 'custom'
+        # Allow caller to provide a friendly scenario name
+        scenario_name = scenario_dict.get('scenario_name', 'custom')
 
     logging.info(f"=== Running FIO Model for scenario: {scenario_name} ===")
     logging.info(f"Scenario parameters: {scenario_dict}")
 
-    meta = {'scenario_name': scenario_name, 'parameters': scenario_dict, 'timestamp': datetime.utcnow().isoformat() + 'Z'}
+    meta = {
+        'scenario_name': scenario_name,
+        'parameters': scenario_dict,
+        'timestamp': datetime.utcnow().isoformat() + 'Z',
+    }
     (config.OUTPUT_DATA_DIR / 'last_scenario.json').write_text(json.dumps(meta, indent=2))
 
     # Step 1: Layer 1

@@ -4,15 +4,15 @@ from pathlib import Path
 from . import config as appcfg
 
 # === CORE PARAMETERS ===
-EFIO_DEFAULT = 1.28e10
+EFIO_DEFAULT = 8.96e9
 HOUSEHOLD_POPULATION_DEFAULT = 10
 KS_PER_M_DEFAULT = 0.003
 
 # === CONTAINMENT EFFICIENCY MAP ===
 CONTAINMENT_EFFICIENCY_DEFAULT = {
-    1: 0.55, # Sewered systems (calibrated)
-    2: 0.15, # Basic pit latrines (calibrated)
-    3: 0.55, # Septic/improved (calibrated)
+    1: 0.50, # Sewered systems (calibrated)
+    2: 0.10, # Basic pit latrines (calibrated)
+    3: 0.30, # Septic/improved (calibrated)
     4: 0.00  # No containment (open defecation)
 }
 
@@ -38,9 +38,12 @@ SANITATION_COLUMN_MAPPING = {
 
 # === SCENARIOS ===
 SCENARIOS = {
+    # Baseline
     'crisis_2025_current': {
+        'label': 'Current situation (status quo)',
+        'description': 'No interventions applied.',
         'pop_factor': 1.0,
-        'EFIO_override': 8.96e9,
+        'EFIO_override': EFIO_DEFAULT,
         'ks_per_m': KS_PER_M_DEFAULT,
         'radius_by_type': RADIUS_BY_TYPE_DEFAULT.copy(),
         'od_reduction_percent': 0.0,
@@ -48,17 +51,44 @@ SCENARIOS = {
         'centralized_treatment_enabled': False,
         'fecal_sludge_treatment_percent': 0.0,
     },
-    'calibrated_trend_baseline': {
+
+    # Interventions reflecting report themes
+    'stone_town_wsp_kisakasaka': {
+        'label': 'Stone Town WSP (Kisakasaka) – outfall mitigation',
+        'description': 'Pilot centralized treatment to reduce sea outfalls.',
         'pop_factor': 1.0,
-        'EFIO_override': 1.0e7,
-        'ks_per_m': 0.06,
+        'EFIO_override': EFIO_DEFAULT,
+        'ks_per_m': KS_PER_M_DEFAULT,
         'radius_by_type': RADIUS_BY_TYPE_DEFAULT.copy(),
-        'od_reduction_percent': 0.0,
-        'infrastructure_upgrade_percent': 0.0,
+        'od_reduction_percent': 10.0,
+        'infrastructure_upgrade_percent': 30.0,
+        'centralized_treatment_enabled': True,
+        'fecal_sludge_treatment_percent': 30.0,
+    },
+    'fsm_scale_up': {
+        'label': 'Faecal Sludge Management (FSM) scale-up',
+        'description': 'Increase sludge collection and treatment capacity.',
+        'pop_factor': 1.0,
+        'EFIO_override': EFIO_DEFAULT,
+        'ks_per_m': KS_PER_M_DEFAULT,
+        'radius_by_type': RADIUS_BY_TYPE_DEFAULT.copy(),
+        'od_reduction_percent': 10.0,
+        'infrastructure_upgrade_percent': 20.0,
         'centralized_treatment_enabled': False,
-        'fecal_sludge_treatment_percent': 0.0,
-        'efficiency_override': {1: 0.50, 2: 0.10, 3: 0.30, 4: 0.0},
-    }
+        'fecal_sludge_treatment_percent': 60.0,
+    },
+    'hotel_coastal_belt_compliance': {
+        'label': 'Hotels & coastal belt compliance upgrades',
+        'description': 'Improve on-site treatment and reduce leaks near coast.',
+        'pop_factor': 1.0,
+        'EFIO_override': EFIO_DEFAULT,
+        'ks_per_m': KS_PER_M_DEFAULT,
+        'radius_by_type': RADIUS_BY_TYPE_DEFAULT.copy(),
+        'od_reduction_percent': 20.0,
+        'infrastructure_upgrade_percent': 50.0,
+        'centralized_treatment_enabled': False,
+        'fecal_sludge_treatment_percent': 30.0,
+    },
 }
 
 # === PATHS ===

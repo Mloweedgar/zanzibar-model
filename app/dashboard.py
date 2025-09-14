@@ -53,7 +53,28 @@ def _load_outputs() -> Dict[str, pd.DataFrame]:
     return outputs
 
 
-def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFrame, *, heat_radius: int = 18, show_private: bool = True, show_government: bool = True, show_ward_load: bool = False, show_ward_boundaries: bool = False, highlight_borehole_id: Optional[str] = None, zoom_to_highlight: bool = True):
+def _apply_template_to_state(params: Dict[str, Any]) -> None:
+    """Prefill Streamlit session state for the Scenario Builder from a template dict."""
+    ss = st.session_state
+    try:
+        ss['od_reduction_percent'] = int(params.get('od_reduction_percent', 0))
+    except Exception:
+        ss['od_reduction_percent'] = 0
+    try:
+        ss['infrastructure_upgrade_percent'] = int(params.get('infrastructure_upgrade_percent', 0))
+    except Exception:
+        ss['infrastructure_upgrade_percent'] = 0
+    try:
+        ss['fecal_sludge_treatment_percent'] = int(params.get('fecal_sludge_treatment_percent', 0))
+    except Exception:
+        ss['fecal_sludge_treatment_percent'] = 0
+    ss['centralized_treatment_enabled'] = bool(params.get('centralized_treatment_enabled', False))
+    try:
+        ss['pop_factor'] = float(params.get('pop_factor', 1.0))
+    except Exception:
+        ss['pop_factor'] = 1.0
+
+def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFrame, *, show_private: bool = True, show_government: bool = True, show_ward_load: bool = False, show_ward_boundaries: bool = False, highlight_borehole_id: Optional[str] = None, zoom_to_highlight: bool = True):
     """High-performance WebGL renderer using pydeck. Avoids clustering and handles large point sets smoothly."""
 
     center = [-6.165, 39.202]
@@ -67,19 +88,19 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
         conc100 = pd.to_numeric(d.get('concentration_CFU_per_100mL', np.nan), errors='coerce')
         d['logC'] = np.log10(conc100.replace(0, np.nan))
         def cat(v: float) -> str:
-            try:
-                x = float(v)
-            except Exception:
-                return 'unknown'
-            if pd.isna(x) or x < 0:
-                return 'unknown'
-            if x < 10:
-                return 'low'
-            if x < 100:
-                return 'moderate'
-            if x < 1000:
-                return 'high'
-            return 'very high'
+                try:
+                    x = float(v)
+                except Exception:
+                    return 'unknown'
+                if pd.isna(x) or x < 0:
+                    return 'unknown'
+                if x < 10:
+                    return 'low'
+                if x < 100:
+                    return 'moderate'
+                if x < 1000:
+                    return 'high'
+                return 'very high'
         d['conc_category'] = conc100.apply(cat)
         # Ensure fields exist for tooltips
         for col in ['Q_L_per_day','lab_e_coli_CFU_per_100mL','lab_total_coliform_CFU_per_100mL','total_surviving_fio_load','borehole_id','borehole_type','concentration_CFU_per_100mL']:
@@ -310,36 +331,33 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
 
 
 def _scenario_selector() -> Dict[str, Any]:
-    names = list(config.SCENARIOS.keys())
-    idx = names.index('crisis_2025_current') if 'crisis_2025_current' in names else 0
-    selected = st.sidebar.selectbox('Scenario template', options=names, index=idx)
-    return {"name": selected, "params": dict(config.SCENARIOS[selected])}
+    items = list(config.SCENARIOS.items())
+    default_key = 'crisis_2025_current' if 'crisis_2025_current' in config.SCENARIOS else items[0][0]
+    with st.sidebar.expander('Select Scenario template to pre-fill Template builder', expanded=True):
+        labels = [cfg.get('label', key) for key, cfg in items]
+        keys = [key for key, _ in items]
+        idx = keys.index(default_key) if default_key in keys else 0
+        selected_label = st.selectbox('Template', options=labels, index=idx, key='scenario_template_select')
+        selected_key = keys[labels.index(selected_label)]
+        desc = config.SCENARIOS[selected_key].get('description')
+        if desc:
+            st.caption(desc)
+        if st.button('Use this template', key='apply_template_btn'):
+            _apply_template_to_state(config.SCENARIOS[selected_key])
+            st.success('Template applied to Scenario Builder')
+    return {"name": selected_key, "params": dict(config.SCENARIOS[selected_key])}
 
 
 def _tunable_controls(base: Dict[str, Any]) -> Dict[str, Any]:
     st.sidebar.markdown('---')
-    st.sidebar.subheader('Decision-maker settings')
-    od_red = st.sidebar.slider('Convert OD to septic (%)', 0, 100, int(base.get('od_reduction_percent', 0)))
-    upgrade = st.sidebar.slider('Upgrade pit latrines to septic (%)', 0, 100, int(base.get('infrastructure_upgrade_percent', 0)))
-    fecal_sludge = st.sidebar.slider('Fecal sludge treatment (%)', 0, 100, int(base.get('fecal_sludge_treatment_percent', 0)))
-    full_ct = st.sidebar.checkbox('Centralized treatment (sewered)', value=bool(base.get('centralized_treatment_enabled', False)))
-    heat_radius_sidebar = st.sidebar.slider('Heatmap radius', min_value=8, max_value=32, value=int(base.get('heatmap_radius', 18)), step=2)
-    st.sidebar.caption('Other settings are available under Advanced.')
-    with st.sidebar.expander('Advanced system settings'):
-        pop_factor = st.number_input('Population factor', min_value=0.1, max_value=5.0, value=float(base.get('pop_factor', 1.0)), step=0.05)
-        ks_per_m = st.number_input('Spatial decay ks (1/m)', min_value=0.0, max_value=0.01, value=float(base.get('ks_per_m', config.KS_PER_M_DEFAULT)), step=0.0005, format='%0.4f')
-        rbt = base.get('radius_by_type', config.RADIUS_BY_TYPE_DEFAULT)
-        colr1, colr2 = st.columns(2)
-        with colr1:
-            r_priv = st.number_input('Private radius (m)', min_value=10, max_value=1000, value=int(rbt.get('private', 30)), step=5)
-        with colr2:
-            r_gov = st.number_input('Government radius (m)', min_value=10, max_value=2000, value=int(rbt.get('government', 100)), step=10)
-        efio = st.text_input('EFIO override (CFU/person/day, blank = default)', value=str(base.get('EFIO_override') or ''))
-        hh_default = config.HOUSEHOLD_POPULATION_DEFAULT
-        # Q is now provided by enriched CSVs; keep UI minimal and avoid Q overrides
-        batch_size = st.number_input('Linking batch size', min_value=100, max_value=20000, value=int(base.get('link_batch_size', 1000)), step=100)
-        rebuild = st.checkbox('Rebuild standardized sanitation table from raw this run', value=bool(base.get('rebuild_standardized', False)))
-        eff = config.CONTAINMENT_EFFICIENCY_DEFAULT
+    st.sidebar.subheader('Scenario Builder')
+    od_red = st.sidebar.slider('Convert OD to septic (%)', 0, 100, int(st.session_state.get('od_reduction_percent', base.get('od_reduction_percent', 0))))
+    upgrade = st.sidebar.slider('Upgrade pit latrines to septic (%)', 0, 100, int(st.session_state.get('infrastructure_upgrade_percent', base.get('infrastructure_upgrade_percent', 0))))
+    fecal_sludge = st.sidebar.slider('Fecal sludge treatment (%)', 0, 100, int(st.session_state.get('fecal_sludge_treatment_percent', base.get('fecal_sludge_treatment_percent', 0))))
+    full_ct = st.sidebar.checkbox('Centralized treatment (sewered)', value=bool(st.session_state.get('centralized_treatment_enabled', base.get('centralized_treatment_enabled', False))))
+    
+    # Inline advanced parameters
+    pop_factor = st.sidebar.number_input('Population factor', min_value=0.1, max_value=5.0, value=float(st.session_state.get('pop_factor', base.get('pop_factor', 1.0))), step=0.05)
     # Removed map display sidebar to keep UI simple
     show_private = bool(base.get('show_private', True))
     show_government = bool(base.get('show_government', True))
@@ -350,15 +368,10 @@ def _tunable_controls(base: Dict[str, Any]) -> Dict[str, Any]:
     scenario = dict(base)
     scenario.update({
         'pop_factor': float(pop_factor),
-        'ks_per_m': float(ks_per_m),
         'centralized_treatment_enabled': bool(full_ct),
         'od_reduction_percent': float(od_red),
         'infrastructure_upgrade_percent': float(upgrade),
         'fecal_sludge_treatment_percent': float(fecal_sludge),
-        'heatmap_radius': int(heat_radius_sidebar),
-        'radius_by_type': {'private': int(r_priv), 'government': int(r_gov)},
-        'link_batch_size': int(batch_size),
-        'rebuild_standardized': bool(rebuild),
         'show_private': bool(show_private),
         'show_government': bool(show_government),
         'show_ward_load': bool(show_ward_load),
@@ -366,10 +379,6 @@ def _tunable_controls(base: Dict[str, Any]) -> Dict[str, Any]:
         'highlight_borehole_id': str(highlight_id).strip() if str(highlight_id).strip() else None,
         'zoom_to_highlight': bool(zoom_to_highlight)
     })
-    try:
-        scenario['EFIO_override'] = float(efio) if efio.strip() else None
-    except Exception:
-        scenario['EFIO_override'] = None
     return scenario
 
 
@@ -420,11 +429,13 @@ def main():
     run_clicked = st.sidebar.button('Run scenario')
     if run_clicked:
         with st.spinner(f"Running pipeline for {sel['name']} (customized)..."):
-            fio_runner.run_scenario(tuned)
+            scenario_payload = dict(tuned)
+            scenario_payload['scenario_name'] = f"custom__{sel['name']}"
+            fio_runner.run_scenario(scenario_payload)
         st.success('Scenario outputs updated.')
 
     outs = _load_outputs()
-    heat_radius = int(tuned.get('heatmap_radius', 18))
+    # Heatmap radius removed
     toggled = _legend_and_toggles({
         'show_private': bool(tuned.get('show_private', True)),
         'show_government': bool(tuned.get('show_government', True)),
@@ -434,7 +445,6 @@ def main():
         outs['priv_bh_dash'],
         outs['gov_bh_dash'],
         outs['hh_loads_markers'],
-        heat_radius=heat_radius,
         show_private=bool(toggled.get('show_private', True)),
         show_government=bool(toggled.get('show_government', True)),
         
