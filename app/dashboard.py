@@ -8,18 +8,7 @@ import json
 import streamlit as st
 import pandas as pd
 import numpy as np
-import folium
-from folium.plugins import Fullscreen, HeatMap
-try:
-    # Fast clustered rendering for large point sets
-    from folium.plugins import FastMarkerCluster
-except Exception:
-    FastMarkerCluster = None
 import pydeck as pdk
-try:
-    from folium.features import RegularPolygonMarker
-except Exception:
-    RegularPolygonMarker = None
  
 
 # Support both package and script execution
@@ -143,6 +132,13 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
             d['size_px'] = d['logC'].apply(size_from_log).astype(float)
             d['color_rgba'] = d['conc_category'].apply(color_from_cat)
 
+    # Enlarge government points slightly for clear distinction
+    if not bh_gov.empty:
+        try:
+            bh_gov['size_px'] = (bh_gov['size_px'].astype(float) * 1.35 + 0.5).clip(lower=3.0)
+        except Exception:
+            pass
+
     layers = []
     # Always create layers with explicit visibility; toggles control 'visible'
     if not bh_priv.empty:
@@ -162,16 +158,18 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
         ))
     if not bh_gov.empty:
         layers.append(pdk.Layer(
-            'TextLayer',
+            'ScatterplotLayer',
             data=bh_gov,
             get_position='[long, lat]',
-            get_text='"■"',
-            get_color='color_rgba',
-            get_size='size_px',
-            size_scale=2.0,
-            get_text_anchor='"middle"',
-            get_alignment_baseline='"center"',
+            get_fill_color='color_rgba',
+            get_radius='size_px',
+            radius_units='pixels',
             pickable=False,
+            auto_highlight=False,
+            stroked=True,
+            get_line_color='[0,0,0,220]',
+            line_width_min_pixels=1.5,
+            opacity=0.95,
             visible=bool(show_government),
             id='layer-gov-bh'
         ))
@@ -269,251 +267,7 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
     return deck
 
 
-def _single_map(borehole_conc: pd.DataFrame, priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFrame, *, heat_radius: int = 18, cluster_markers: bool = True) -> folium.Map:
-    center = [-6.165, 39.202]
-    m = folium.Map(location=center, zoom_start=10, control_scale=True, prefer_canvas=True)
-    Fullscreen().add_to(m)
-
-    bh_priv = priv_bh.dropna(subset=['lat','long']).copy() if not priv_bh.empty else pd.DataFrame(columns=['borehole_id','borehole_type','lat','long','Q_L_per_day','concentration_CFU_per_100mL','total_surviving_fio_load'])
-    bh_gov = gov_bh.dropna(subset=['lat','long']).copy() if not gov_bh.empty else pd.DataFrame(columns=['borehole_id','borehole_type','lat','long','Q_L_per_day','concentration_CFU_per_100mL','total_surviving_fio_load'])
-    if 'borehole_type' not in bh_priv.columns and not bh_priv.empty:
-        bh_priv['borehole_type'] = 'private'
-    if 'borehole_type' not in bh_gov.columns and not bh_gov.empty:
-        bh_gov['borehole_type'] = 'government'
-
-    for df in (bh_priv, bh_gov):
-        if not df.empty:
-            conc100 = pd.to_numeric(df.get('concentration_CFU_per_100mL', np.nan), errors='coerce')
-            df['logC'] = np.log10(conc100.replace(0, np.nan))
-            # Ensure lab columns are numeric if present
-            for lab_col in ['lab_e_coli_CFU_per_100mL', 'lab_total_coliform_CFU_per_100mL']:
-                if lab_col in df.columns:
-                    df[lab_col] = pd.to_numeric(df[lab_col], errors='coerce')
-            # Concentration categories for popups
-            def _cat(v: float) -> str:
-                try:
-                    x = float(v)
-                except Exception:
-                    return 'unknown'
-                if pd.isna(x) or x < 0:
-                    return 'unknown'
-                if x < 10:
-                    return 'low'
-                if x < 100:
-                    return 'moderate'
-                if x < 1000:
-                    return 'high'
-                return 'very high'
-            df['conc_category'] = conc100.apply(_cat)
-
-    def color_for(val: float, vmin: float, vmax: float) -> str:
-        if pd.isna(val):
-            return '#cccccc'
-        t = 0.0 if vmax == vmin else (val - vmin) / (vmax - vmin)
-        def lerp(a,b,t): return int(a + (b - a) * t)
-        return f"#{lerp(255,189,t):02x}{lerp(255,0,t):02x}{lerp(178,38,t):02x}"
-
-    # Category color mapping for marker pins (folium.Icon color names)
-    def color_name_for_category(cat: str) -> str:
-        c = (cat or '').lower()
-        if c == 'low':
-            return 'green'
-        if c == 'moderate':
-            return 'blue'
-        if c == 'high':
-            return 'orange'
-        if c == 'very high':
-            return 'red'
-        return 'gray'
-
-    # Hex colors for faster, canvas-rendered circle markers
-    def hex_color_for_category(cat: str) -> str:
-        c = (cat or '').lower()
-        if c == 'low':
-            return '#2ecc71'
-        if c == 'moderate':
-            return '#3498db'
-        if c == 'high':
-            return '#f39c12'
-        if c == 'very high':
-            return '#e74c3c'
-        return '#7f8c8d'
-
-    def add_legend(m: folium.Map) -> None:
-        legend_html = (
-            '<div style="position: fixed; bottom: 18px; left: 18px; z-index: 9999; background: white;'
-            ' padding: 10px 12px; border: 1px solid #999; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.3); font-size: 12px;">'
-            '<b>Legend</b><br>'
-            '<div style="margin-top: 6px;">'
-            '<span style="display:inline-block;width:10px;height:10px;background:#2c3e50;border-radius:50%;margin-right:6px;"></span> Private borehole (pin icon)<br>'
-            '<span style="display:inline-block;width:10px;height:10px;background:#2c3e50;margin-right:6px;border:1px solid #2c3e50;"></span> Government borehole (square pin)<br>'
-            '<div style="margin-top:6px;"><b>Concentration</b></div>'
-            '<span style="display:inline-block;width:10px;height:10px;background:#2ecc71;margin-right:6px;"></span> Low (&lt;10)<br>'
-            '<span style="display:inline-block;width:10px;height:10px;background:#3498db;margin-right:6px;"></span> Moderate (10–99)<br>'
-            '<span style="display:inline-block;width:10px;height:10px;background:#f39c12;margin-right:6px;"></span> High (100–999)<br>'
-            '<span style="display:inline-block;width:10px;height:10px;background:#e74c3c;margin-right:6px;"></span> Very high (≥1000)'
-            '</div></div>'
-        )
-        m.get_root().html.add_child(folium.Element(legend_html))
-
-    # Private markers + heat (prefer canvas circles; off by default for faster initial render)
-    priv_markers = folium.FeatureGroup(name='Private boreholes (markers)', show=False)
-    if not bh_priv.empty:
-        use_cluster = bool(cluster_markers) and FastMarkerCluster is not None
-        if use_cluster and len(bh_priv) > 500:
-            dfn = bh_priv.copy()
-            # Cap extremely large datasets to keep DOM light and interactions smooth
-            if 'logC' in dfn.columns and len(dfn) > 15000:
-                dfn = dfn.nlargest(15000, 'logC')
-            data = []
-            for _, row in dfn.iterrows():
-                cat = row.get('conc_category', 'unknown')
-                popup_html = (
-                f"<b>{row.get('borehole_id')}</b><br>"
-                f"Type: {row.get('borehole_type','-')}<br>"
-                f"Conc (CFU/100mL): {_format_large(row.get('concentration_CFU_per_100mL', np.nan))}<br>"
-                f"Category: {row.get('conc_category','-')}<br>"
-            )
-                data.append([
-                    float(row['lat']),
-                    float(row['long']),
-                    popup_html,
-                    str(cat)
-                ])
-            cb = (
-                "function (row) {\n"
-                "  var color = 'gray';\n"
-                "  var c = String(row[3] || '').toLowerCase();\n"
-                "  if (c === 'low') color = 'green';\n"
-                "  else if (c === 'moderate') color = 'blue';\n"
-                "  else if (c === 'high') color = 'orange';\n"
-                "  else if (c === 'very high') color = 'red';\n"
-                "  var marker = L.marker(new L.LatLng(row[0], row[1]), {\n"
-                "    icon: L.AwesomeMarkers.icon({ icon: 'tint', prefix: 'fa', markerColor: color })\n"
-                "  });\n"
-                "  if (row[2]) { marker.bindPopup(row[2], {maxWidth: 300}); }\n"
-                "  return marker;\n"
-                "}"
-            )
-            FastMarkerCluster(data=data, callback=cb, options={'chunkedLoading': True}).add_to(priv_markers)
-        else:
-            dfn = bh_priv.copy()
-            # For non-clustered rendering, also cap to avoid too many DOM nodes
-            if 'logC' in dfn.columns and len(dfn) > 8000:
-                dfn = dfn.nlargest(8000, 'logC')
-            for _, row in dfn.iterrows():
-                cat = row.get('conc_category', 'unknown')
-                color_hex = hex_color_for_category(cat)
-                # Keep popup lightweight to improve performance
-                popup = (
-                    f"<b>{row.get('borehole_id')}</b><br>"
-                    f"Type: {row.get('borehole_type','-')}<br>"
-                    f"Conc: {_format_large(row.get('concentration_CFU_per_100mL', np.nan))} CFU/100mL"
-                )
-                folium.CircleMarker(
-                    [row['lat'], row['long']],
-                    radius=4.5,
-                    color=color_hex,
-                    fill=True,
-                    fill_color=color_hex,
-                    fill_opacity=0.85,
-                    weight=1,
-                    popup=folium.Popup(popup, max_width=260),
-                    tooltip=f"{row.get('borehole_id')}"
-                ).add_to(priv_markers)
-    priv_markers.add_to(m)
-
-    priv_heat = folium.FeatureGroup(name='Private boreholes (heatmap)', show=False)
-    if not bh_priv.empty and bh_priv['logC'].notna().any():
-        dfn = bh_priv.dropna(subset=['logC']).copy()
-        if len(dfn) > 12000: dfn = dfn.nlargest(12000, 'logC')
-        vmin, vmax = float(dfn['logC'].min()), float(dfn['logC'].max())
-        denom = (vmax - vmin) if vmax != vmin else 1.0
-        dfn['w'] = (dfn['logC'] - vmin) / denom
-        HeatMap(dfn[['lat','long','w']].values.tolist(), radius=int(heat_radius), blur=int(max(10, heat_radius-4)), min_opacity=0.3, max_zoom=18).add_to(priv_heat)
-    priv_heat.add_to(m)
-
-    # Government markers + heat (prefer canvas circles; off by default for faster initial render)
-    gov_markers = folium.FeatureGroup(name='Government boreholes (markers)', show=False)
-    if not bh_gov.empty:
-        for _, row in bh_gov.iterrows():
-            cat = row.get('conc_category', 'unknown')
-            color_hex = hex_color_for_category(cat)
-            popup = (
-                f"<b>{row.get('borehole_id')}</b><br>"
-                f"Type: {row.get('borehole_type','-')}<br>"
-                f"Conc: {_format_large(row.get('concentration_CFU_per_100mL', np.nan))} CFU/100mL"
-            )
-            folium.CircleMarker(
-                [row['lat'], row['long']],
-                radius=5.0,
-                color=color_hex,
-                fill=True,
-                fill_color=color_hex,
-                fill_opacity=0.9,
-                weight=1.5,
-                popup=folium.Popup(popup, max_width=260),
-                tooltip=f"{row.get('borehole_id')}"
-            ).add_to(gov_markers)
-    gov_markers.add_to(m)
-
-    gov_heat = folium.FeatureGroup(name='Government boreholes (heatmap)', show=False)
-    if not bh_gov.empty and bh_gov['logC'].notna().any():
-        dfn = bh_gov.dropna(subset=['logC']).copy()
-        if len(dfn) > 12000: dfn = dfn.nlargest(12000, 'logC')
-        vmin, vmax = float(dfn['logC'].min()), float(dfn['logC'].max())
-        denom = (vmax - vmin) if vmax != vmin else 1.0
-        dfn['w'] = (dfn['logC'] - vmin) / denom
-        HeatMap(dfn[['lat','long','w']].values.tolist(), radius=int(heat_radius), blur=int(max(10, heat_radius-4)), min_opacity=0.3, max_zoom=18).add_to(gov_heat)
-    gov_heat.add_to(m)
-
-    # Toilets markers + heat
-    toilets_markers = folium.FeatureGroup(name='Toilets net pathogen load (markers)', show=False)
-    toilets_heat = folium.FeatureGroup(name='Toilets net pathogen load (heatmap)', show=False)
-    th = toilets.dropna(subset=['lat','long']).copy()
-    if not th.empty:
-        th['logL'] = np.log10(pd.to_numeric(th['fio_load'], errors='coerce').replace(0, np.nan))
-        if th['logL'].notna().any():
-            vmin_t, vmax_t = float(th['logL'].min()), float(th['logL'].max())
-            for _, row in th.iterrows():
-                logl = row.get('logL', np.nan)
-                size = 2 if pd.isna(logl) else 2 + 6 * (0.0 if vmax_t == vmin_t else (logl - vmin_t) / (vmax_t - vmin_t))
-                popup = f"<b>{row.get('id')}</b><br>Net load (CFU/day): {_format_large(row.get('fio_load', np.nan))}"
-                folium.CircleMarker([row['lat'], row['long']], radius=float(size), color=color_for(logl, vmin_t, vmax_t), fill=True, fill_opacity=0.6, popup=folium.Popup(popup, max_width=240), tooltip=f"{row.get('id')}").add_to(toilets_markers)
-            dfn = th.dropna(subset=['logL']).copy()
-            if len(dfn) > 20000: dfn = dfn.nlargest(20000, 'logL')
-            denom = (vmax_t - vmin_t) if vmax_t != vmin_t else 1.0
-            dfn['w'] = (dfn['logL'] - vmin_t) / denom
-            HeatMap(dfn[['lat','long','w']].values.tolist(), radius=int(heat_radius), blur=int(max(10, heat_radius-4)), min_opacity=0.3, max_zoom=18).add_to(toilets_heat)
-    toilets_markers.add_to(m)
-    toilets_heat.add_to(m)
-
-    # Zoom gating: only draw marker layers when zoomed in to reduce load
-    min_zoom_for_markers = 12
-    script = f"""
-    <script>
-    var mapObj = {m.get_name()};
-    var priv = {priv_markers.get_name()};
-    var gov = {gov_markers.get_name()};
-    function syncMarkerLayers() {{
-      var z = mapObj.getZoom();
-      if (z >= {min_zoom_for_markers}) {{
-        if (!mapObj.hasLayer(priv)) mapObj.addLayer(priv);
-        if (!mapObj.hasLayer(gov)) mapObj.addLayer(gov);
-      }} else {{
-        if (mapObj.hasLayer(priv)) mapObj.removeLayer(priv);
-        if (mapObj.hasLayer(gov)) mapObj.removeLayer(gov);
-      }}
-    }}
-    mapObj.on('zoomend', syncMarkerLayers);
-    setTimeout(syncMarkerLayers, 0);
-    </script>
-    """
-    m.get_root().html.add_child(folium.Element(script))
-
-    folium.LayerControl(collapsed=False).add_to(m)
-    add_legend(m)
-    return m
+ 
 
 
 def _scenario_selector() -> Dict[str, Any]:
@@ -605,11 +359,11 @@ def _legend_and_toggles(defaults: Dict[str, bool]) -> Dict[str, bool]:
 """
     st.markdown(html, unsafe_allow_html=True)
     # Streamlit toggles just below legend
-    col1, col2, col3 = st.columns([1,1,1])
+    col1, col2, col3 = st.columns([3,3,2])
     with col1:
-        show_private = st.checkbox('Private', value=bool(defaults.get('show_private', True)))
+        show_private = st.checkbox('Pathogens Concentration - Private Wells', value=bool(defaults.get('show_private', True)))
     with col2:
-        show_government = st.checkbox('Government', value=bool(defaults.get('show_government', True)))
+        show_government = st.checkbox('Pathogens Concentration - ZAWA Boreholes', value=bool(defaults.get('show_government', True)))
     with col3:
         show_ward_boundaries = st.checkbox('Ward boundaries', value=bool(defaults.get('show_ward_boundaries', False)))
     return {
