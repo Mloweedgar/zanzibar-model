@@ -10,6 +10,7 @@ from datetime import datetime
 from . import fio_config as config
 from . import fio_core
 from . import fio_transport
+from . import calibrate
 
 
 def setup_logging(level: str = 'INFO') -> None:
@@ -93,6 +94,31 @@ def run_scenario(scenario: Union[Dict[str, Any], str] = 'crisis_2025_current') -
     if not borehole_concentrations.empty:
         priv = borehole_concentrations[borehole_concentrations['borehole_type']=='private'].copy()
         gov = borehole_concentrations[borehole_concentrations['borehole_type']=='government'].copy()
+
+        # Apply calibration mapping if available
+        calibration_params_path = config.OUTPUT_DATA_DIR / 'calibration_params.json'
+        if calibration_params_path.exists():
+            try:
+                with open(calibration_params_path, 'r') as f:
+                    calibration_params = json.load(f)
+                logging.info(f"Applying calibration mapping: {calibration_params['method']}")
+                
+                # Apply to private boreholes
+                if not priv.empty and 'concentration_CFU_per_100mL' in priv.columns:
+                    priv_conc = priv['concentration_CFU_per_100mL'].to_numpy()
+                    priv_lab_equiv = calibrate.apply_calibration_mapping(priv_conc, calibration_params)
+                    priv['lab_equivalent_CFU_per_100mL'] = priv_lab_equiv
+                    priv['risk_category'] = calibrate.categorize_concentrations(priv_lab_equiv)
+                
+                # Apply to government boreholes
+                if not gov.empty and 'concentration_CFU_per_100mL' in gov.columns:
+                    gov_conc = gov['concentration_CFU_per_100mL'].to_numpy()
+                    gov_lab_equiv = calibrate.apply_calibration_mapping(gov_conc, calibration_params)
+                    gov['lab_equivalent_CFU_per_100mL'] = gov_lab_equiv
+                    gov['risk_category'] = calibrate.categorize_concentrations(gov_lab_equiv)
+                    
+            except Exception as e:
+                logging.warning(f"Failed to apply calibration mapping: {e}")
 
         # Join coordinates (and lab columns where available) from borehole source tables
         priv_coords = private_df[['id','lat','long']].rename(columns={'id':'borehole_id'}) if not private_df.empty else pd.DataFrame(columns=['borehole_id','lat','long'])
