@@ -73,15 +73,35 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
                 return 'unknown'
             if pd.isna(x) or x < 0:
                 return 'unknown'
-            if x < 10: return 'low'
-            if x < 100: return 'moderate'
-            if x < 1000: return 'high'
+            if x < 10:
+                return 'low'
+            if x < 100:
+                return 'moderate'
+            if x < 1000:
+                return 'high'
             return 'very high'
         d['conc_category'] = conc100.apply(cat)
         # Ensure fields exist for tooltips
         for col in ['Q_L_per_day','lab_e_coli_CFU_per_100mL','lab_total_coliform_CFU_per_100mL','total_surviving_fio_load','borehole_id','borehole_type','concentration_CFU_per_100mL']:
             if col not in d.columns:
                 d[col] = np.nan
+        # Build per-row tooltip HTML for boreholes
+        try:
+            def _fmt(v):
+                return _format_large(v)
+            def _row_html(row: pd.Series) -> str:
+                bid = str(row.get('borehole_id') or '-')
+                btype = str(row.get('borehole_type') or '-')
+                conc = _fmt(row.get('concentration_CFU_per_100mL'))
+                lab = _fmt(row.get('lab_total_coliform_CFU_per_100mL'))
+                return (
+                    f"<div><b>{bid}</b> <small>({btype})</small><br>"
+                    f"Calculated Concentration(By Model): <b>{conc} </b> CFU/100mL<br>"
+                    f"Lab Total Coliform(E. coli): <b>{lab} </b> CFU/100mL<br>"
+                )
+            d['tooltip_html'] = d.apply(_row_html, axis=1)
+        except Exception:
+            d['tooltip_html'] = ''
         return d
 
     bh_priv = prepare_bh(priv_bh, 'private')
@@ -101,7 +121,7 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
         return [231, 76, 60, 220]
     for d in (bh_priv, bh_gov):
         if not d.empty:
-            lab_vals = pd.to_numeric(d.get('lab_e_coli_CFU_per_100mL', np.nan), errors='coerce')
+            lab_vals = pd.to_numeric(d.get('lab_total_coliform_CFU_per_100mL', np.nan), errors='coerce')
             d['lab_color_rgba'] = lab_vals.apply(lab_color_from_value)
 
     # Combined range for consistent size scaling
@@ -149,8 +169,8 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
             get_fill_color='color_rgba',
             get_radius='size_px',
             radius_units='pixels',
-            pickable=False,
-            auto_highlight=False,
+            pickable=True,
+            auto_highlight=True,
             stroked=False,
             opacity=0.85,
             visible=bool(show_private),
@@ -164,8 +184,8 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
             get_fill_color='color_rgba',
             get_radius='size_px',
             radius_units='pixels',
-            pickable=False,
-            auto_highlight=False,
+            pickable=True,
+            auto_highlight=True,
             stroked=True,
             get_line_color='[0,0,0,220]',
             line_width_min_pixels=1.5,
@@ -229,32 +249,51 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
         if p.exists():
             with open(p, 'r', encoding='utf-8') as fh:
                 wards_geo = json.load(fh)
-            # Try common ward name keys
-            ward_name_keys = ['WARD_NAME','ward_name','Ward_Name','ward','name']
-            def ward_name_accessor():
-                # Build a JS accessor string to pick whichever property exists
-                checks = []
-                for k in ward_name_keys:
-                    checks.append(f"f.properties && f.properties['{k}']")
-                expr = ' || '.join(checks)
-                return f"function(f){{ return ({expr}) || '' }}"
+            # Flatten fields for tooltip token replacement (avoid nested properties path)
+            try:
+                feats = wards_geo.get('features', [])
+                for f in feats:
+                    props = f.get('properties') or {}
+                    f['ward_label'] = props.get('ward_name') or ''
+                    f['div_name'] = props.get('div_name') or ''
+                    f['counc_name'] = props.get('counc_name') or ''
+                    f['dist_name'] = props.get('dist_name') or ''
+                    f['reg_name'] = props.get('reg_name') or ''
+                    f['tooltip_html'] = (
+                        f"<div><b>{f['ward_label']}</b><br><small>"
+                        f"Division: {f['div_name']} &nbsp;•&nbsp; Council: {f['counc_name']}<br>"
+                        f"District: {f['dist_name']} &nbsp;•&nbsp; Region: {f['reg_name']}"
+                        f"</small></div>"
+                    )
+            except Exception:
+                pass
             layers.append(pdk.Layer(
                 'GeoJsonLayer',
                 data=wards_geo,
                 stroked=True,
-                filled=False,
+                filled=True,
+                get_fill_color='[0,0,0,0]',
                 get_line_color='[40,40,40,160]',
                 line_width_min_pixels=1,
                 pickable=True,
-                getTooltip={ 'text': ward_name_accessor() },
                 visible=bool(show_ward_boundaries),
                 id='layer-ward-outline'
             ))
     except Exception:
         pass
 
-    # Disable default tooltip; we'll only show context on click via deck's default info panel
-    tooltip = None
+    # Unified tooltip content for all pickable layers
+    tooltip = {
+        'html': '{tooltip_html}',
+        'style': {
+            'backgroundColor': 'rgba(255,255,255,0.95)',
+            'color': '#111',
+            'fontSize': '12px',
+            'borderRadius': '6px',
+            'padding': '6px 8px',
+            'boxShadow': '0 2px 6px rgba(0,0,0,0.15)'
+        }
+    }
 
     deck = pdk.Deck(
         layers=layers,
