@@ -1,7 +1,6 @@
 pandas
 geopandas
 matplotlib
-folium
 streamlit
 requests
 scikit-learn
