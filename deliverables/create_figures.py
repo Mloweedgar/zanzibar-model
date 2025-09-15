@@ -7,18 +7,60 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import pearsonr
+import os
+import json
+
+def _load_model_thresholds(defaults=(10.0, 100.0, 1000.0)) -> tuple[float, float, float]:
+    mapping_path = os.path.join('data', 'output', 'calibration_mapping.json')
+    try:
+        with open(mapping_path, 'r', encoding='utf-8') as fh:
+            data = json.load(fh)
+        node = data.get('category_thresholds_model_CFU_per_100mL')
+        t1 = float(node['Low_Upper'])
+        t2 = float(node['Moderate_Upper'])
+        t3 = float(node['High_Upper'])
+        if not (t1 > 0 and t2 > t1 and t3 > t2):
+            raise ValueError('thresholds not strictly increasing')
+        return (t1, t2, t3)
+    except Exception:
+        return defaults
+
+def _fmt_large(x) -> str:
+    try:
+        x = float(x)
+        a = abs(x)
+        if a >= 1e12: return f"{x/1e12:.1f}T"
+        if a >= 1e9: return f"{x/1e9:.1f}B"
+        if a >= 1e6: return f"{x/1e6:.1f}M"
+        if a >= 1e3: return f"{x/1e3:.1f}K"
+        return f"{x:.0f}"
+    except Exception:
+        return "-"
 
 def create_model_vs_lab_scatter():
     """Create model vs lab scatter plot."""
     # Load government data
     gov_data = pd.read_csv('data/output/dashboard_government_boreholes.csv')
     
+    # Choose lab column (prefer calibration mapping, then total coliform, then E. coli)
+    lab_pref = None
+    try:
+        with open('data/output/calibration_mapping.json', 'r', encoding='utf-8') as fh:
+            lab_pref = json.load(fh).get('lab_column_used')
+    except Exception:
+        lab_pref = None
+    candidates = [lab_pref, 'lab_total_coliform_CFU_per_100mL', 'lab_e_coli_CFU_per_100mL']
+    lab_col = next((c for c in candidates if c and c in gov_data.columns), None)
+    if lab_col is None:
+        print("No recognized lab column found; skipping scatter plot.")
+        return
+    
     # Process lab data
-    gov_data['lab_ecoli_numeric'] = pd.to_numeric(gov_data['lab_e_coli_CFU_per_100mL'], errors='coerce')
+    gov_data['lab_numeric'] = pd.to_numeric(gov_data[lab_col], errors='coerce')
     
     # Get data for plotting (use floor of 0.1 for non-detects)
-    has_lab = gov_data[gov_data['lab_ecoli_numeric'].notna()].copy()
-    has_lab['lab_floor'] = has_lab['lab_ecoli_numeric'].apply(lambda x: max(x, 0.1))
+    has_lab = gov_data[gov_data['lab_numeric'].notna()].copy()
+    has_lab['lab_floor'] = has_lab['lab_numeric'].apply(lambda x: max(x, 0.1))
     
     model_vals = has_lab['concentration_CFU_per_100mL'].values
     lab_vals = has_lab['lab_floor'].values
@@ -27,8 +69,8 @@ def create_model_vs_lab_scatter():
     fig, ax = plt.subplots(1, 1, figsize=(10, 8))
     
     # Scatter plot with different markers for detects vs non-detects
-    detects = has_lab['lab_ecoli_numeric'] > 0
-    non_detects = has_lab['lab_ecoli_numeric'] == 0
+    detects = has_lab['lab_numeric'] > 0
+    non_detects = has_lab['lab_numeric'] == 0
     
     # Plot non-detects
     if non_detects.any():
@@ -55,7 +97,7 @@ def create_model_vs_lab_scatter():
     # Calculate correlations for positive detections only
     if detects.sum() >= 2:
         pos_model = model_vals[detects]
-        pos_lab = has_lab.loc[detects, 'lab_ecoli_numeric'].values
+        pos_lab = has_lab.loc[detects, 'lab_numeric'].values
         
         from scipy.stats import spearmanr, kendalltau
         spear_rho, _ = spearmanr(pos_model, pos_lab)
@@ -78,7 +120,14 @@ def create_model_vs_lab_scatter():
     
     # Labels and title
     ax.set_xlabel('Modeled Concentration (CFU/100mL)', fontsize=12)
-    ax.set_ylabel('Laboratory E. coli (CFU/100mL)', fontsize=12)
+    # Dynamic y-axis label
+    y_label = 'Laboratory (CFU/100mL)'
+    lname = (lab_col or '').replace('_CFU_per_100mL','').replace('_',' ').lower()
+    if 'total' in lname and 'coliform' in lname:
+        y_label = 'Laboratory Total Coliform (CFU/100mL)'
+    elif 'e coli' in lname or 'ecoli' in lname:
+        y_label = 'Laboratory E. coli (CFU/100mL)'
+    ax.set_ylabel(y_label, fontsize=12)
     ax.set_title('Model vs Laboratory Validation\nZanzibar Government Boreholes', fontsize=14)
     ax.legend()
     ax.grid(True, alpha=0.3)
@@ -144,18 +193,30 @@ def create_category_comparison():
     gov_data = pd.read_csv('data/output/dashboard_government_boreholes.csv')
     private_data = pd.read_csv('data/output/dashboard_private_boreholes.csv')
     
+    T1, T2, T3 = _load_model_thresholds()
     def categorize_concentration(conc):
-        if conc < 10: return 'Low (<10)'
-        elif conc < 100: return 'Moderate (10-99)'  
-        elif conc < 1000: return 'High (100-999)'
-        else: return 'Very High (≥1000)'
+        try:
+            x = float(conc)
+        except Exception:
+            return 'Unknown'
+        if np.isnan(x) or x < 0:
+            return 'Unknown'
+        if x < T1: return f"Low (<{_fmt_large(T1)})"
+        elif x < T2: return f"Moderate ({_fmt_large(T1)}–{_fmt_large(T2)})"
+        elif x < T3: return f"High ({_fmt_large(T2)}–{_fmt_large(T3)})"
+        else: return f"Very High (≥{_fmt_large(T3)})"
     
     # Categorize
     gov_data['category'] = gov_data['concentration_CFU_per_100mL'].apply(categorize_concentration)
     private_data['category'] = private_data['concentration_CFU_per_100mL'].apply(categorize_concentration)
     
     # Count categories
-    categories = ['Low (<10)', 'Moderate (10-99)', 'High (100-999)', 'Very High (≥1000)']
+    categories = [
+        f"Low (<{_fmt_large(T1)})",
+        f"Moderate ({_fmt_large(T1)}–{_fmt_large(T2)})",
+        f"High ({_fmt_large(T2)}–{_fmt_large(T3)})",
+        f"Very High (≥{_fmt_large(T3)})"
+    ]
     gov_counts = [gov_data[gov_data['category'] == cat].shape[0] for cat in categories]
     priv_counts = [private_data[private_data['category'] == cat].shape[0] for cat in categories]
     

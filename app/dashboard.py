@@ -20,6 +20,29 @@ except Exception:
     from . import fio_runner
 
 
+def _get_model_thresholds() -> tuple[float, float, float]:
+    """Strictly load model-side thresholds (CFU/100mL) from calibration_mapping.json.
+
+    Raises if the file or required fields are missing/invalid.
+    """
+    p = config.OUTPUT_DATA_DIR / 'calibration_mapping.json'
+    if not p.exists():
+        raise FileNotFoundError(f"Expected thresholds at {p}; run calibration to create this file.")
+    with open(p, 'r', encoding='utf-8') as fh:
+        data = json.load(fh)
+    node = data.get('category_thresholds_model_CFU_per_100mL')
+    if not isinstance(node, dict):
+        raise KeyError("Missing 'category_thresholds_model_CFU_per_100mL' in calibration_mapping.json")
+    try:
+        t1 = float(node['Low_Upper'])
+        t2 = float(node['Moderate_Upper'])
+        t3 = float(node['High_Upper'])
+    except Exception as e:
+        raise KeyError("Threshold fields Low_Upper/Moderate_Upper/High_Upper not found or not numeric") from e
+    if not (t1 > 0 and t2 > t1 and t3 > t2):
+        raise ValueError("Thresholds must be strictly increasing and positive")
+    return (t1, t2, t3)
+
 def _format_large(x) -> str:
     # Robust formatter: accepts numbers or numeric strings; returns '-' if not parseable
     try:
@@ -78,6 +101,8 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
     """High-performance WebGL renderer using pydeck. Avoids clustering and handles large point sets smoothly."""
 
     center = [-6.165, 39.202]
+    # Use calibrated model-side thresholds if available
+    T1, T2, T3 = _get_model_thresholds()
 
     def prepare_bh(df: pd.DataFrame, default_type: str) -> pd.DataFrame:
         if df is None or df.empty:
@@ -87,20 +112,22 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
             d['borehole_type'] = default_type
         conc100 = pd.to_numeric(d.get('concentration_CFU_per_100mL', np.nan), errors='coerce')
         d['logC'] = np.log10(conc100.replace(0, np.nan))
+
         def cat(v: float) -> str:
-                try:
-                    x = float(v)
-                except Exception:
-                    return 'unknown'
-                if pd.isna(x) or x < 0:
-                    return 'unknown'
-                if x < 10:
-                    return 'low'
-                if x < 100:
-                    return 'moderate'
-                if x < 1000:
-                    return 'high'
-                return 'very high'
+            try:
+                x = float(v)
+            except Exception:
+                return 'unknown'
+            if pd.isna(x) or x < 0:
+                return 'unknown'
+            if x < T1:
+                return 'low'
+            if x < T2:
+                return 'moderate'
+            if x < T3:
+                return 'high'
+            return 'very high'
+
         d['conc_category'] = conc100.apply(cat)
         # Ensure fields exist for tooltips
         for col in ['Q_L_per_day','lab_e_coli_CFU_per_100mL','lab_total_coliform_CFU_per_100mL','total_surviving_fio_load','borehole_id','borehole_type','concentration_CFU_per_100mL']:
@@ -119,6 +146,7 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
                     f"<div><b>{bid}</b> <small>({btype})</small><br>"
                     f"Calculated Concentration(By Model): <b>{conc} </b> CFU/100mL<br>"
                     f"Lab Total Coliform(E. coli): <b>{lab} </b> CFU/100mL<br>"
+                    f"</div>"
                 )
             d['tooltip_html'] = d.apply(_row_html, axis=1)
         except Exception:
@@ -145,21 +173,6 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
             lab_vals = pd.to_numeric(d.get('lab_total_coliform_CFU_per_100mL', np.nan), errors='coerce')
             d['lab_color_rgba'] = lab_vals.apply(lab_color_from_value)
 
-    # Combined range for consistent size scaling
-    logs = pd.concat([bh_priv['logC'].dropna(), bh_gov['logC'].dropna()], ignore_index=True)
-    if len(logs) >= 2:
-        vmin, vmax = float(np.nanpercentile(logs, 5)), float(np.nanpercentile(logs, 95))
-        if not np.isfinite(vmin) or not np.isfinite(vmax) or vmin == vmax:
-            vmin, vmax = float(logs.min()), float(logs.max())
-    else:
-        vmin, vmax = -1.0, 1.0
-
-    def size_from_log(v: float) -> float:
-        if pd.isna(v):
-            return 3.0
-        t = 0.0 if vmax == vmin else (float(v) - vmin) / (vmax - vmin)
-        return 3.0 + 7.0 * max(0.0, min(1.0, t))
-
     def color_from_cat(c: str):
         c = (c or '').lower()
         if c == 'low': return [46, 204, 113, 200]      # green
@@ -168,17 +181,21 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
         if c == 'very high': return [231, 76, 60, 200] # red
         return [160, 160, 160, 200]                    # gray
 
+    # Use fixed marker sizes (private: 5 px, government: 7 px) so only color varies by concentration
     for d in (bh_priv, bh_gov):
         if not d.empty:
-            d['size_px'] = d['logC'].apply(size_from_log).astype(float)
             d['color_rgba'] = d['conc_category'].apply(color_from_cat)
-
-    # Enlarge government points slightly for clear distinction
+    if not bh_priv.empty:
+        try:
+            bh_priv['size_px'] = float(5.0)
+        except Exception:
+            bh_priv['size_px'] = 5.0
     if not bh_gov.empty:
         try:
-            bh_gov['size_px'] = (bh_gov['size_px'].astype(float) * 1.35 + 0.5).clip(lower=3.0)
+            bh_gov['size_px'] = float(7.0)
         except Exception:
-            pass
+            bh_gov['size_px'] = 7.0
+    # Government layer already uses a black stroke in the ScatterplotLayer config below
 
     layers = []
     # Always create layers with explicit visibility; toggles control 'visible'
@@ -351,74 +368,58 @@ def _scenario_selector() -> Dict[str, Any]:
 def _tunable_controls(base: Dict[str, Any]) -> Dict[str, Any]:
     st.sidebar.markdown('---')
     st.sidebar.subheader('Scenario Builder')
-    od_red = st.sidebar.slider('Convert OD to septic (%)', 0, 100, int(st.session_state.get('od_reduction_percent', base.get('od_reduction_percent', 0))))
-    upgrade = st.sidebar.slider('Upgrade pit latrines to septic (%)', 0, 100, int(st.session_state.get('infrastructure_upgrade_percent', base.get('infrastructure_upgrade_percent', 0))))
-    fecal_sludge = st.sidebar.slider('Fecal sludge treatment (%)', 0, 100, int(st.session_state.get('fecal_sludge_treatment_percent', base.get('fecal_sludge_treatment_percent', 0))))
-    full_ct = st.sidebar.checkbox('Centralized treatment (sewered)', value=bool(st.session_state.get('centralized_treatment_enabled', base.get('centralized_treatment_enabled', False))))
-    
-    # Inline advanced parameters
-    pop_factor = st.sidebar.number_input('Population factor', min_value=0.1, max_value=5.0, value=float(st.session_state.get('pop_factor', base.get('pop_factor', 1.0))), step=0.05)
-    # Removed map display sidebar to keep UI simple
-    show_private = bool(base.get('show_private', True))
-    show_government = bool(base.get('show_government', True))
-    show_ward_load = bool(base.get('show_ward_load', False))
-    show_ward_boundaries = bool(base.get('show_ward_boundaries', False))
-    highlight_id = str(base.get('highlight_borehole_id') or '')
-    zoom_to_highlight = bool(base.get('zoom_to_highlight', True))
-    scenario = dict(base)
-    scenario.update({
-        'pop_factor': float(pop_factor),
-        'centralized_treatment_enabled': bool(full_ct),
-        'od_reduction_percent': float(od_red),
-        'infrastructure_upgrade_percent': float(upgrade),
-        'fecal_sludge_treatment_percent': float(fecal_sludge),
-        'show_private': bool(show_private),
-        'show_government': bool(show_government),
-        'show_ward_load': bool(show_ward_load),
-        'show_ward_boundaries': bool(show_ward_boundaries),
-        'highlight_borehole_id': str(highlight_id).strip() if str(highlight_id).strip() else None,
-        'zoom_to_highlight': bool(zoom_to_highlight)
-    })
+    st.sidebar.caption('Open the form below to edit settings. Changes apply only when you click Run scenario.')
+    # Provide only visualization defaults and highlight options from base; scenario edits happen in the form
+    scenario = {
+        'show_private': bool(base.get('show_private', True)),
+        'show_government': bool(base.get('show_government', True)),
+        'show_ward_boundaries': bool(base.get('show_ward_boundaries', False)),
+        'highlight_borehole_id': base.get('highlight_borehole_id'),
+        'zoom_to_highlight': bool(base.get('zoom_to_highlight', True)),
+    }
     return scenario
 
 
 def _legend_and_toggles(defaults: Dict[str, bool]) -> Dict[str, bool]:
-    # Legend bar
-    html = """
-<style>
-.legend-top { display: flex; align-items: center; gap: 16px; margin: 8px 0 6px 0; padding: 10px 12px; background: #ffffff;
-              border: 1px solid #e0e0e0; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); font-size: 13px; }
-.legend-top .title { font-weight: 600; margin-right: 6px; color: #333; }
-.legend-top .entry { display: inline-flex; align-items: center; gap: 6px; color: #333; }
-.legend-top .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-.legend-top .sep { width: 1px; height: 14px; background: #e0e0e0; margin: 0 2px; }
-@media (max-width: 768px) { .legend-top { flex-wrap: wrap; gap: 10px; } }
-</style>
-<div class=\"legend-top\">
-  <div class=\"title\">Concentration (CFU/100mL):</div>
-  <div class=\"entry\"><span class=\"dot\" style=\"background:#2ecc71\"></span>Low</div>
-  <div class=\"sep\"></div>
-  <div class=\"entry\"><span class=\"dot\" style=\"background:#3498db\"></span>Moderate</div>
-  <div class=\"sep\"></div>
-  <div class=\"entry\"><span class=\"dot\" style=\"background:#f39c12\"></span>High</div>
-  <div class=\"sep\"></div>
-  <div class=\"entry\"><span class=\"dot\" style=\"background:#e74c3c\"></span>Very high</div>
-</div>
-"""
-    st.markdown(html, unsafe_allow_html=True)
-    # Streamlit toggles just below legend
-    col1, col2, col3 = st.columns([3,3,2])
-    with col1:
-        show_private = st.checkbox('Pathogens Concentration - Private Wells', value=bool(defaults.get('show_private', True)))
-    with col2:
-        show_government = st.checkbox('Pathogens Concentration - ZAWA Boreholes', value=bool(defaults.get('show_government', True)))
-    with col3:
-        show_ward_boundaries = st.checkbox('Ward boundaries', value=bool(defaults.get('show_ward_boundaries', False)))
-    return {
-        'show_private': bool(show_private),
-        'show_government': bool(show_government),
-        'show_ward_boundaries': bool(show_ward_boundaries),
-    }
+        # Load calibrated thresholds for legend labels (model-side, CFU/100mL)
+        t1, t2, t3 = _get_model_thresholds()
+        t1s, t2s, t3s = _format_large(t1), _format_large(t2), _format_large(t3)
+        # Legend bar
+        html = """
+    <style>
+    .legend-top { display: flex; align-items: center; gap: 16px; margin: 8px 0 6px 0; padding: 10px 12px; background: #ffffff;
+                  border: 1px solid #e0e0e0; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); font-size: 13px; }
+    .legend-top .title { font-weight: 600; margin-right: 6px; color: #333; }
+    .legend-top .entry { display: inline-flex; align-items: center; gap: 6px; color: #333; }
+    .legend-top .dot { width: 10px; height: 10px; border-radius: 50%%; display: inline-block; }
+    .legend-top .sep { width: 1px; height: 14px; background: #e0e0e0; margin: 0 2px; }
+    @media (max-width: 768px) { .legend-top { flex-wrap: wrap; gap: 10px; } }
+    </style>
+    <div class="legend-top">
+      <div class="title">Concentration (CFU/100mL):</div>
+      <div class="entry"><span class="dot" style="background:#2ecc71"></span>Low </div>
+      <div class="sep"></div>
+      <div class="entry"><span class="dot" style="background:#3498db"></span>Moderate </div>
+      <div class="sep"></div>
+      <div class="entry"><span class="dot" style="background:#f39c12"></span>High </div>
+      <div class="sep"></div>
+      <div class="entry"><span class="dot" style="background:#e74c3c"></span>Very high </div>
+    </div>
+    """ % {'t1s': t1s, 't2s': t2s, 't3s': t3s}
+        st.markdown(html, unsafe_allow_html=True)
+        # Streamlit toggles just below legend
+        col1, col2, col3 = st.columns([3, 3, 2])
+        with col1:
+            show_private = st.checkbox('Pathogens Concentration - Private Wells', value=bool(defaults.get('show_private', True)))
+        with col2:
+            show_government = st.checkbox('Pathogens Concentration - ZAWA Boreholes', value=bool(defaults.get('show_government', True)))
+        with col3:
+            show_ward_boundaries = st.checkbox('Ward boundaries', value=bool(defaults.get('show_ward_boundaries', False)))
+        return {
+            'show_private': bool(show_private),
+            'show_government': bool(show_government),
+            'show_ward_boundaries': bool(show_ward_boundaries),
+        }
 
 
 def main():
@@ -426,12 +427,29 @@ def main():
 
     sel = _scenario_selector()
     tuned = _tunable_controls(sel['params'])
-    run_clicked = st.sidebar.button('Run scenario')
-    if run_clicked:
-        with st.spinner(f"Running pipeline for {sel['name']} (customized)..."):
-            scenario_payload = dict(tuned)
-            scenario_payload['scenario_name'] = f"custom__{sel['name']}"
-            fio_runner.run_scenario(scenario_payload)
+
+    # Single-submit scenario form: edits are buffered until submitted
+    with st.sidebar.form('scenario_form'):
+        st.markdown('#### Edit scenario settings')
+        pop_factor = st.number_input('Population factor', min_value=0.1, max_value=5.0, value=float(sel['params'].get('pop_factor', 1.0)), step=0.05)
+        full_ct = st.checkbox('Centralized treatment (sewered)', value=bool(sel['params'].get('centralized_treatment_enabled', False)))
+        od_red = st.slider('Convert OD to septic (%)', 0, 100, int(sel['params'].get('od_reduction_percent', 0)))
+        upgrade = st.slider('Upgrade pit latrines to septic (%)', 0, 100, int(sel['params'].get('infrastructure_upgrade_percent', 0)))
+        fecal_sludge = st.slider('Fecal sludge treatment (%)', 0, 100, int(sel['params'].get('fecal_sludge_treatment_percent', 0)))
+
+        submitted = st.form_submit_button('Run scenario')
+        if submitted:
+            with st.spinner(f"Running scenario pipeline..."):
+                scenario_payload = dict(sel['params'])
+                scenario_payload.update({
+                    'scenario_name': f"custom__{sel['name']}",
+                    'pop_factor': float(pop_factor),
+                    'centralized_treatment_enabled': bool(full_ct),
+                    'od_reduction_percent': float(od_red),
+                    'infrastructure_upgrade_percent': float(upgrade),
+                    'fecal_sludge_treatment_percent': float(fecal_sludge),
+                })
+                fio_runner.run_scenario(scenario_payload)
         st.success('Scenario outputs updated.')
 
     outs = _load_outputs()

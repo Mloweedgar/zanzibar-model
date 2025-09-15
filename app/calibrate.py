@@ -41,12 +41,14 @@ def _run_once(params: CalibParams, base_scenario: Dict[str, Any]) -> Tuple[float
     if gov.empty:
         return np.inf, 0
 
-    # Expect modeled concentration in CFU/100mL and lab E. coli CFU/100mL if present
+    # Expect modeled concentration in CFU/100mL and lab CFU/100mL if present
     if 'concentration_CFU_per_100mL' not in gov.columns:
         return np.inf, 0
 
     model = pd.to_numeric(gov['concentration_CFU_per_100mL'], errors='coerce')
-    lab = pd.to_numeric(gov.get('lab_e_coli_CFU_per_100mL', np.nan), errors='coerce')
+    # Prefer Total Coliform for calibration if available; fallback to E. coli
+    lab_col = 'lab_total_coliform_CFU_per_100mL' if 'lab_total_coliform_CFU_per_100mL' in gov.columns else 'lab_e_coli_CFU_per_100mL'
+    lab = pd.to_numeric(gov.get(lab_col, np.nan), errors='coerce')
     mask = model.notna() & lab.notna()
     if mask.sum() == 0:
         return np.inf, 0
@@ -127,7 +129,8 @@ def run_efficiency_calibration(
                     score, n = np.inf, 0
                 else:
                     model = pd.to_numeric(gov['concentration_CFU_per_100mL'], errors='coerce')
-                    lab = pd.to_numeric(gov.get('lab_e_coli_CFU_per_100mL', np.nan), errors='coerce')
+                    lab_col = 'lab_total_coliform_CFU_per_100mL' if 'lab_total_coliform_CFU_per_100mL' in gov.columns else 'lab_e_coli_CFU_per_100mL'
+                    lab = pd.to_numeric(gov.get(lab_col, np.nan), errors='coerce')
                     mask = model.notna() & lab.notna()
                     if mask.sum() == 0:
                         score, n = np.inf, 0
@@ -229,7 +232,8 @@ def run_trend_search(
                             rmse = float('inf')
                         else:
                             model = pd.to_numeric(gov['concentration_CFU_per_100mL'], errors='coerce')
-                            lab = pd.to_numeric(gov.get('lab_e_coli_CFU_per_100mL', np.nan), errors='coerce')
+                            lab_col = 'lab_total_coliform_CFU_per_100mL' if 'lab_total_coliform_CFU_per_100mL' in gov.columns else 'lab_e_coli_CFU_per_100mL'
+                            lab = pd.to_numeric(gov.get(lab_col, np.nan), errors='coerce')
                             mask = model.notna() & lab.notna()
                             m = model[mask]
                             l = lab[mask].clip(lower=1.0)

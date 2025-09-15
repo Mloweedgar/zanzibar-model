@@ -1,209 +1,33 @@
 {
   "grid": {
     "ks_per_m": [
-      0.0003,
-      0.0005,
-      0.001,
-      0.0015,
-      0.002,
       0.003
     ],
     "efio_scale": [
       0.7,
-      0.85,
-      1.0,
-      1.15,
-      1.3
+      1.0
     ]
   },
   "results": [
     {
-      "ks_per_m": 0.0003,
-      "efio_scale": 0.7,
-      "rmse_log": 6.164981809270361,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.0003,
-      "efio_scale": 0.85,
-      "rmse_log": 6.2489045122394895,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.0003,
-      "efio_scale": 1.0,
-      "rmse_log": 6.319160445864269,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.0003,
-      "efio_scale": 1.15,
-      "rmse_log": 6.379584419854329,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.0003,
-      "efio_scale": 1.3,
-      "rmse_log": 6.43259393950839,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.0005,
-      "efio_scale": 0.7,
-      "rmse_log": 6.158738326694811,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.0005,
-      "efio_scale": 0.85,
-      "rmse_log": 6.242660185906752,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.0005,
-      "efio_scale": 1.0,
-      "rmse_log": 6.3129154386943735,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.0005,
-      "efio_scale": 1.15,
-      "rmse_log": 6.373338844888113,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.0005,
-      "efio_scale": 1.3,
-      "rmse_log": 6.426347879426694,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.001,
-      "efio_scale": 0.7,
-      "rmse_log": 6.143153780993916,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.001,
-      "efio_scale": 0.85,
-      "rmse_log": 6.227073496911859,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.001,
-      "efio_scale": 1.0,
-      "rmse_log": 6.297327020119281,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.001,
-      "efio_scale": 1.15,
-      "rmse_log": 6.3577489838035,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.001,
-      "efio_scale": 1.3,
-      "rmse_log": 6.410756785814926,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.0015,
-      "efio_scale": 0.7,
-      "rmse_log": 6.127603921598062,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.0015,
-      "efio_scale": 0.85,
-      "rmse_log": 6.211521445159146,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.0015,
-      "efio_scale": 1.0,
-      "rmse_log": 6.281773199008765,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.0015,
-      "efio_scale": 1.15,
-      "rmse_log": 6.342193686874606,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.0015,
-      "efio_scale": 1.3,
-      "rmse_log": 6.395200227798221,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.002,
-      "efio_scale": 0.7,
-      "rmse_log": 6.11208896087494,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.002,
-      "efio_scale": 0.85,
-      "rmse_log": 6.196004242216749,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.002,
-      "efio_scale": 1.0,
-      "rmse_log": 6.266254186286637,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.002,
-      "efio_scale": 1.15,
-      "rmse_log": 6.32667316448841,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.002,
-      "efio_scale": 1.3,
-      "rmse_log": 6.379678415305237,
-      "n_matched_boreholes": 42
-    },
-    {
       "ks_per_m": 0.003,
       "efio_scale": 0.7,
-      "rmse_log": 6.081164576596703,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.003,
-      "efio_scale": 0.85,
-      "rmse_log": 6.165075220664058,
-      "n_matched_boreholes": 42
+      "rmse_log": 5.112283477889437,
+      "n_matched_boreholes": 40
     },
     {
       "ks_per_m": 0.003,
       "efio_scale": 1.0,
-      "rmse_log": 6.235321421291243,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.003,
-      "efio_scale": 1.15,
-      "rmse_log": 6.295737276447384,
-      "n_matched_boreholes": 42
-    },
-    {
-      "ks_per_m": 0.003,
-      "efio_scale": 1.3,
-      "rmse_log": 6.348739858132392,
-      "n_matched_boreholes": 42
+      "rmse_log": 5.26508761682782,
+      "n_matched_boreholes": 40
     }
   ],
   "best": {
-    "score": 6.081164576596703,
+    "score": 5.112283477889437,
     "params": {
       "ks_per_m": 0.003,
       "efio_scale": 0.7
     },
-    "n": 42
+    "n": 40
   }
 }

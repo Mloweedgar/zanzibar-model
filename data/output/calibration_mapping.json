@@ -1,0 +1,27 @@
+{
+  "timestamp": "2025-09-14T17:48:58Z",
+  "lab_column_used": "lab_total_coliform_CFU_per_100mL",
+  "n_pairs_all": 40,
+  "n_pairs_positive": 36,
+  "log_regression": {
+    "alpha": 2.983449890842163,
+    "beta": -0.3172351965013364,
+    "rmse_log": 0.7844756080295241
+  },
+  "scale_only": {
+    "scale_s_model_over_lab": 129678.7230180938,
+    "rmse_log_on_positives": 0.7386694709191824
+  },
+  "category_thresholds_model_CFU_per_100mL": {
+    "Low_Upper": 1296787.230180938,
+    "Moderate_Upper": 12967872.30180938,
+    "High_Upper": 129678723.01809381,
+    "VeryHigh_Lower": 129678723.01809381
+  },
+  "gov_boreholes_category_counts": {
+    "Low": 15,
+    "Moderate": 27,
+    "High": 2,
+    "Very high": 0
+  }
+}

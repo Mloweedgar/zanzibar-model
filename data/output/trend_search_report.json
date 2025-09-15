@@ -1,231 +1,46 @@
 {
   "grids": {
     "ks_per_m": [
-      0.05,
-      0.08,
-      0.1,
-      0.12
+      0.003
     ],
     "EFIO_override": [
-      10000000.0
+      8960000000.0
     ],
     "eff_cat1": [
       0.5
     ],
     "eff_cat2": [
-      0.1,
-      0.2
+      0.1
     ],
     "eff_cat3": [
-      0.3,
-      0.5
+      0.3
     ]
   },
   "results": [
     {
-      "ks_per_m": 0.05,
-      "EFIO_override": 10000000.0,
+      "ks_per_m": 0.003,
+      "EFIO_override": 8960000000.0,
       "eff_cat1": 0.5,
       "eff_cat2": 0.1,
       "eff_cat3": 0.3,
-      "n_matched_boreholes": 3,
-      "spearman_rho": 0.5,
-      "kendall_tau": 0.33333333333333337,
-      "pearson_r_log": 0.7020638076874272,
-      "rmse_log": 0.8392689411368649
-    },
-    {
-      "ks_per_m": 0.05,
-      "EFIO_override": 10000000.0,
-      "eff_cat1": 0.5,
-      "eff_cat2": 0.1,
-      "eff_cat3": 0.5,
-      "n_matched_boreholes": 3,
-      "spearman_rho": 0.5,
-      "kendall_tau": 0.33333333333333337,
-      "pearson_r_log": 0.7020638076874272,
-      "rmse_log": 0.8392689411368649
-    },
-    {
-      "ks_per_m": 0.05,
-      "EFIO_override": 10000000.0,
-      "eff_cat1": 0.5,
-      "eff_cat2": 0.2,
-      "eff_cat3": 0.3,
-      "n_matched_boreholes": 3,
-      "spearman_rho": 0.5,
-      "kendall_tau": 0.33333333333333337,
-      "pearson_r_log": 0.7020638076874272,
-      "rmse_log": 0.8392689411368649
-    },
-    {
-      "ks_per_m": 0.05,
-      "EFIO_override": 10000000.0,
-      "eff_cat1": 0.5,
-      "eff_cat2": 0.2,
-      "eff_cat3": 0.5,
-      "n_matched_boreholes": 3,
-      "spearman_rho": 0.5,
-      "kendall_tau": 0.33333333333333337,
-      "pearson_r_log": 0.7020638076874272,
-      "rmse_log": 0.8392689411368649
-    },
-    {
-      "ks_per_m": 0.08,
-      "EFIO_override": 10000000.0,
-      "eff_cat1": 0.5,
-      "eff_cat2": 0.1,
-      "eff_cat3": 0.3,
-      "n_matched_boreholes": 3,
-      "spearman_rho": 1.0,
-      "kendall_tau": 1.0,
-      "pearson_r_log": 0.7398078778236756,
-      "rmse_log": 0.5223559196253109
-    },
-    {
-      "ks_per_m": 0.08,
-      "EFIO_override": 10000000.0,
-      "eff_cat1": 0.5,
-      "eff_cat2": 0.1,
-      "eff_cat3": 0.5,
-      "n_matched_boreholes": 3,
-      "spearman_rho": 1.0,
-      "kendall_tau": 1.0,
-      "pearson_r_log": 0.7398078778236756,
-      "rmse_log": 0.5223559196253109
-    },
-    {
-      "ks_per_m": 0.08,
-      "EFIO_override": 10000000.0,
-      "eff_cat1": 0.5,
-      "eff_cat2": 0.2,
-      "eff_cat3": 0.3,
-      "n_matched_boreholes": 3,
-      "spearman_rho": 1.0,
-      "kendall_tau": 1.0,
-      "pearson_r_log": 0.7398078778236756,
-      "rmse_log": 0.5223559196253109
-    },
-    {
-      "ks_per_m": 0.08,
-      "EFIO_override": 10000000.0,
-      "eff_cat1": 0.5,
-      "eff_cat2": 0.2,
-      "eff_cat3": 0.5,
-      "n_matched_boreholes": 3,
-      "spearman_rho": 1.0,
-      "kendall_tau": 1.0,
-      "pearson_r_log": 0.7398078778236756,
-      "rmse_log": 0.5223559196253109
-    },
-    {
-      "ks_per_m": 0.1,
-      "EFIO_override": 10000000.0,
-      "eff_cat1": 0.5,
-      "eff_cat2": 0.1,
-      "eff_cat3": 0.3,
-      "n_matched_boreholes": 3,
-      "spearman_rho": 1.0,
-      "kendall_tau": 1.0,
-      "pearson_r_log": 0.79276421833925,
-      "rmse_log": 0.5896852724723088
-    },
-    {
-      "ks_per_m": 0.1,
-      "EFIO_override": 10000000.0,
-      "eff_cat1": 0.5,
-      "eff_cat2": 0.1,
-      "eff_cat3": 0.5,
-      "n_matched_boreholes": 3,
-      "spearman_rho": 1.0,
-      "kendall_tau": 1.0,
-      "pearson_r_log": 0.79276421833925,
-      "rmse_log": 0.5896852724723088
-    },
-    {
-      "ks_per_m": 0.1,
-      "EFIO_override": 10000000.0,
-      "eff_cat1": 0.5,
-      "eff_cat2": 0.2,
-      "eff_cat3": 0.3,
-      "n_matched_boreholes": 3,
-      "spearman_rho": 1.0,
-      "kendall_tau": 1.0,
-      "pearson_r_log": 0.79276421833925,
-      "rmse_log": 0.5896852724723088
-    },
-    {
-      "ks_per_m": 0.1,
-      "EFIO_override": 10000000.0,
-      "eff_cat1": 0.5,
-      "eff_cat2": 0.2,
-      "eff_cat3": 0.5,
-      "n_matched_boreholes": 3,
-      "spearman_rho": 1.0,
-      "kendall_tau": 1.0,
-      "pearson_r_log": 0.79276421833925,
-      "rmse_log": 0.5896852724723088
-    },
-    {
-      "ks_per_m": 0.12,
-      "EFIO_override": 10000000.0,
-      "eff_cat1": 0.5,
-      "eff_cat2": 0.1,
-      "eff_cat3": 0.3,
-      "n_matched_boreholes": 3,
-      "spearman_rho": 1.0,
-      "kendall_tau": 1.0,
-      "pearson_r_log": 0.8759983234107466,
-      "rmse_log": 0.7460508384280937
-    },
-    {
-      "ks_per_m": 0.12,
-      "EFIO_override": 10000000.0,
-      "eff_cat1": 0.5,
-      "eff_cat2": 0.1,
-      "eff_cat3": 0.5,
-      "n_matched_boreholes": 3,
-      "spearman_rho": 1.0,
-      "kendall_tau": 1.0,
-      "pearson_r_log": 0.8759983234107466,
-      "rmse_log": 0.7460508384280937
-    },
-    {
-      "ks_per_m": 0.12,
-      "EFIO_override": 10000000.0,
-      "eff_cat1": 0.5,
-      "eff_cat2": 0.2,
-      "eff_cat3": 0.3,
-      "n_matched_boreholes": 3,
-      "spearman_rho": 1.0,
-      "kendall_tau": 1.0,
-      "pearson_r_log": 0.8759983234107466,
-      "rmse_log": 0.7460508384280937
-    },
-    {
-      "ks_per_m": 0.12,
-      "EFIO_override": 10000000.0,
-      "eff_cat1": 0.5,
-      "eff_cat2": 0.2,
-      "eff_cat3": 0.5,
-      "n_matched_boreholes": 3,
-      "spearman_rho": 1.0,
-      "kendall_tau": 1.0,
-      "pearson_r_log": 0.8759983234107466,
-      "rmse_log": 0.7460508384280937
+      "n_matched_boreholes": 27,
+      "spearman_rho": -0.4872309248690291,
+      "kendall_tau": -0.3739381777438554,
+      "pearson_r_log": -0.5031134781678822,
+      "rmse_log": 4.8455210649098825
     }
   ],
   "best_by_spearman": {
-    "score_spearman": 1.0,
-    "score_kendall": 1.0,
-    "rmse_log": 0.5223559196253109,
+    "score_spearman": -0.4872309248690291,
+    "score_kendall": -0.3739381777438554,
+    "rmse_log": 4.8455210649098825,
     "params": {
-      "ks_per_m": 0.08,
-      "EFIO_override": 10000000.0,
+      "ks_per_m": 0.003,
+      "EFIO_override": 8960000000.0,
       "eff_cat1": 0.5,
       "eff_cat2": 0.1,
       "eff_cat3": 0.3
     },
-    "n": 3
+    "n": 27
   }
 }

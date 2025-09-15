@@ -1,7 +1,7 @@
-pandas
+pandas==2.3.2
 geopandas
-matplotlib
-streamlit
-requests
-scikit-learn
-pydeck
+matplotlib==3.10.6
+streamlit==1.36.0
+requests==2.32.5
+scikit-learn==1.7.2
+pydeck==0.9.1

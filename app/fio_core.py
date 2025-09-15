@@ -54,7 +54,17 @@ def standardize_sanitation_table(
 
 def apply_interventions(df: pd.DataFrame, scenario: Dict[str, Any]) -> pd.DataFrame:
     df = df.copy()
-    eff_map: Dict[int, float] = config.CONTAINMENT_EFFICIENCY_DEFAULT
+    # Start from default containment efficiencies, allow scenario override per category id
+    eff_map: Dict[int, float] = dict(config.CONTAINMENT_EFFICIENCY_DEFAULT)
+    if 'efficiency_override' in scenario and isinstance(scenario['efficiency_override'], dict):
+        for k, v in scenario['efficiency_override'].items():
+            try:
+                eff_map[int(k)] = float(v)
+            except Exception:
+                continue
+    # Ensure the dataframe has the correct efficiency column consistent with categories
+    if 'pathogen_containment_efficiency' not in df.columns:
+        df['pathogen_containment_efficiency'] = df['toilet_category_id'].map(eff_map).fillna(0.0)
 
     pop_factor = scenario.get('pop_factor', 1.0)
     df['household_population'] = df['household_population'] * pop_factor
@@ -86,7 +96,7 @@ def apply_interventions(df: pd.DataFrame, scenario: Dict[str, Any]) -> pd.DataFr
         sewer_mask = df['toilet_category_id'] == 1
         if sewer_mask.any():
             # Set sewered efficiency to exactly 0.90
-            df.loc[sewer_mask, 'pathogen_containment_efficiency'] = 0.90
+            df.loc[sewer_mask, 'pathogen_containment_efficiency'] = float(eff_map.get(1, 0.90))
 
     fecal_sludge_treatment = float(scenario.get('fecal_sludge_treatment_percent', 0.0)) / 100.0
     if fecal_sludge_treatment > 0:
