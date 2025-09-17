@@ -268,18 +268,19 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
 
     # Ward boundaries and choropleth removed; we'll add a lightweight hover-only outline below
 
-    # Map style handling: prefer Mapbox token if provided
-    map_style = None
+    # Map style handling: always use Mapbox; require token from secrets or env
+    map_style = 'mapbox://styles/mapbox/light-v9'
+    map_provider = 'mapbox'
     mapbox_token = None
     try:
         mapbox_token = st.secrets.get('MAPBOX_API_KEY')  # type: ignore[attr-defined]
     except Exception:
         mapbox_token = None
-    if mapbox_token:
-        map_style = 'mapbox://styles/mapbox/light-v9'
-    else:
-        # Public CARTO GL style (no token required)
-        map_style = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'
+    if not mapbox_token:
+        mapbox_token = os.environ.get('MAPBOX_API_KEY') or os.environ.get('MAPBOX_TOKEN')
+    if not mapbox_token:
+        st.error('Missing Mapbox token. Please set MAPBOX_API_KEY in Streamlit secrets or environment.')
+        st.stop()
 
     # Add lightweight ward outline with hover-tooltips (ward name)
     try:
@@ -337,6 +338,7 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
         layers=layers,
         initial_view_state=view_state,
         map_style=map_style,
+        map_provider=map_provider,
         tooltip=tooltip,
     )
     if mapbox_token:
