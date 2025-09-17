@@ -27,34 +27,32 @@ else:
 
 
 @lru_cache(maxsize=1)
-def _get_model_thresholds() -> tuple[float, float, float]:
+def _get_model_thresholds() -> tuple[float, float, float, bool]:
     """Load model-side thresholds (CFU/100mL).
 
     Falls back to sensible defaults if calibration file is missing/invalid
     so the app can start and display data with default bins.
+    
+    Returns: (t1, t2, t3, is_default) where is_default indicates if fallback was used
     """
     default_thresholds = (1e2, 1e3, 1e4)
     p = config.OUTPUT_DATA_DIR / 'calibration_mapping.json'
     try:
         if not p.exists():
-            st.info("Using default thresholds. Run calibration to enable model-calibrated bins.")
-            return default_thresholds
+            return (*default_thresholds, True)
         with open(p, 'r', encoding='utf-8') as fh:
             data = json.load(fh)
         node = data.get('category_thresholds_model_CFU_per_100mL')
         if not isinstance(node, dict):
-            st.warning("Missing thresholds in calibration_mapping.json; using defaults.")
-            return default_thresholds
+            return (*default_thresholds, True)
         t1 = float(node.get('Low_Upper', default_thresholds[0]))
         t2 = float(node.get('Moderate_Upper', default_thresholds[1]))
         t3 = float(node.get('High_Upper', default_thresholds[2]))
         if not (t1 > 0 and t2 > t1 and t3 > t2):
-            st.warning("Invalid thresholds in calibration; using defaults.")
-            return default_thresholds
-        return (t1, t2, t3)
+            return (*default_thresholds, True)
+        return (t1, t2, t3, False)
     except Exception:
-        st.warning("Failed to load thresholds; using defaults.")
-        return default_thresholds
+        return (*default_thresholds, True)
 
 def _format_large(x) -> str:
     # Robust formatter: accepts numbers or numeric strings; returns '-' if not parseable
@@ -169,7 +167,7 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, *, show_private: bo
 
     center = [-6.165, 39.202]
     # Use calibrated model-side thresholds if available
-    T1, T2, T3 = _get_model_thresholds()
+    T1, T2, T3, _ = _get_model_thresholds()  # Ignore the is_default flag here
 
     def prepare_bh(df: pd.DataFrame, default_type: str) -> pd.DataFrame:
         if df is None or df.empty:
@@ -429,8 +427,14 @@ def _tunable_controls(base: Dict[str, Any]) -> Dict[str, Any]:
 
 def _legend_and_toggles(defaults: Dict[str, bool]) -> Dict[str, bool]:
         # Load calibrated thresholds for legend labels (model-side, CFU/100mL)
-        t1, t2, t3 = _get_model_thresholds()
+        t1, t2, t3, is_default = _get_model_thresholds()
         t1s, t2s, t3s = _format_large(t1), _format_large(t2), _format_large(t3)
+        
+        # Show threshold status info if using defaults (but don't block fast render)
+        if is_default and 'threshold_warning_shown' not in st.session_state:
+            st.info("Using default concentration thresholds. Run calibration to enable model-calibrated bins.")
+            st.session_state.threshold_warning_shown = True
+        
         # Legend bar
         html = """
     <style>
@@ -498,7 +502,7 @@ def main():
                     'fecal_sludge_treatment_percent': float(fecal_sludge),
                 })
                 fio_runner.run_scenario(scenario_payload)
-        st.success('Scenario outputs updated.')
+                st.success('Scenario outputs updated.')
 
     # Show legend and toggles BEFORE loading data (for responsive UI)
     toggled = _legend_and_toggles({
