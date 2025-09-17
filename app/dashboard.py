@@ -76,17 +76,56 @@ def _format_large(x) -> str:
 
 
 @st.cache_data(show_spinner=False)
-def _load_outputs() -> Dict[str, pd.DataFrame]:
+def _load_outputs(nrows: Optional[int] = None) -> Dict[str, pd.DataFrame]:
     outputs = {}
-    paths = {
-        'hh_loads_markers': config.DASH_TOILETS_MARKERS_PATH,
-        'hh_loads_heat': config.DASH_TOILETS_HEATMAP_PATH,
-        'priv_bh_dash': config.DASH_PRIVATE_BH_PATH,
-        'gov_bh_dash': config.DASH_GOVERNMENT_BH_PATH,
-        'bh_conc': config.FIO_CONCENTRATION_AT_BOREHOLES_PATH,
+    # Only load what is needed for the map
+    cols_needed = [
+        'borehole_id','borehole_type','lat','long',
+        'concentration_CFU_per_100mL','lab_total_coliform_CFU_per_100mL',
+        'lab_e_coli_CFU_per_100mL','Q_L_per_day'
+    ]
+    dtype_map = {
+        'borehole_id': 'object',
+        'borehole_type': 'object',
+        'lat': 'float64',
+        'long': 'float64',
+        'concentration_CFU_per_100mL': 'float64',
+        'lab_total_coliform_CFU_per_100mL': 'float64',
+        'lab_e_coli_CFU_per_100mL': 'float64',
+        'Q_L_per_day': 'float64',
     }
-    for k, p in paths.items():
-        outputs[k] = pd.read_csv(p) if p.exists() else pd.DataFrame()
+    if nrows is None:
+        try:
+            nrows_env = os.environ.get('FIO_READ_NROWS')
+            nrows = int(nrows_env) if nrows_env else None
+        except Exception:
+            nrows = None
+    for key, path in (
+        ('priv_bh_dash', config.DASH_PRIVATE_BH_PATH),
+        ('gov_bh_dash', config.DASH_GOVERNMENT_BH_PATH),
+    ):
+        if path.exists():
+            try:
+                outputs[key] = pd.read_csv(
+                    path,
+                    usecols=lambda c: c in cols_needed,
+                    dtype=dtype_map,
+                    nrows=nrows,
+                    engine='pyarrow',
+                )
+            except Exception:
+                try:
+                    outputs[key] = pd.read_csv(
+                        path,
+                        usecols=lambda c: c in cols_needed,
+                        dtype=dtype_map,
+                        nrows=nrows,
+                        low_memory=False,
+                    )
+                except Exception:
+                    outputs[key] = pd.read_csv(path, nrows=nrows)
+        else:
+            outputs[key] = pd.DataFrame(columns=cols_needed)
     return outputs
 
 
@@ -111,7 +150,7 @@ def _apply_template_to_state(params: Dict[str, Any]) -> None:
     except Exception:
         ss['pop_factor'] = 1.0
 
-def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFrame, *, show_private: bool = True, show_government: bool = True, show_ward_load: bool = False, show_ward_boundaries: bool = False, highlight_borehole_id: Optional[str] = None, zoom_to_highlight: bool = True):
+def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, *, show_private: bool = True, show_government: bool = True, show_ward_load: bool = False, show_ward_boundaries: bool = False, highlight_borehole_id: Optional[str] = None, zoom_to_highlight: bool = True):
     """High-performance WebGL renderer using pydeck. Avoids clustering and handles large point sets smoothly."""
 
     center = [-6.165, 39.202]
@@ -124,91 +163,53 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
         d = df.dropna(subset=['lat','long']).copy()
         if 'borehole_type' not in d.columns:
             d['borehole_type'] = default_type
-        conc100 = pd.to_numeric(d.get('concentration_CFU_per_100mL', np.nan), errors='coerce')
-        d['logC'] = np.log10(conc100.replace(0, np.nan))
-
-        def cat(v: float) -> str:
-            try:
-                x = float(v)
-            except Exception:
-                return 'unknown'
-            if pd.isna(x) or x < 0:
-                return 'unknown'
-            if x < T1:
-                return 'low'
-            if x < T2:
-                return 'moderate'
-            if x < T3:
-                return 'high'
-            return 'very high'
-
-        d['conc_category'] = conc100.apply(cat)
         # Ensure fields exist for tooltips
         for col in ['Q_L_per_day','lab_e_coli_CFU_per_100mL','lab_total_coliform_CFU_per_100mL','total_surviving_fio_load','borehole_id','borehole_type','concentration_CFU_per_100mL']:
             if col not in d.columns:
                 d[col] = np.nan
-        # Build per-row tooltip HTML for boreholes
-        try:
-            def _fmt(v):
-                return _format_large(v)
-            def _row_html(row: pd.Series) -> str:
-                bid = str(row.get('borehole_id') or '-')
-                btype = str(row.get('borehole_type') or '-')
-                conc = _fmt(row.get('concentration_CFU_per_100mL'))
-                lab = _fmt(row.get('lab_total_coliform_CFU_per_100mL'))
-                return (
-                    f"<div><b>{bid}</b> <small>({btype})</small><br>"
-                    f"Calculated Concentration(By Model): <b>{conc} </b> CFU/100mL<br>"
-                    f"Lab Total Coliform(E. coli): <b>{lab} </b> CFU/100mL<br>"
-                    f"</div>"
-                )
-            d['tooltip_html'] = d.apply(_row_html, axis=1)
-        except Exception:
-            d['tooltip_html'] = ''
+        # Vectorized category + color
+        conc100 = pd.to_numeric(d.get('concentration_CFU_per_100mL', np.nan), errors='coerce')
+        valid = conc100.where(conc100 >= 0)
+        cats = pd.cut(valid, bins=[0, T1, T2, T3, np.inf], right=False, labels=['low','moderate','high','very high'])
+        d['conc_category'] = cats.astype('object').fillna('unknown')
+        color_map = {
+            'low': [46, 204, 113, 200],
+            'moderate': [52, 152, 219, 200],
+            'high': [243, 156, 18, 200],
+            'very high': [231, 76, 60, 200],
+            'unknown': [160, 160, 160, 200],
+        }
+        d['color_rgba'] = d['conc_category'].map(color_map)
         return d
 
     bh_priv = prepare_bh(priv_bh, 'private')
     bh_gov = prepare_bh(gov_bh, 'government')
 
-    # Derive lab-based categories and colors for comparison (outline)
-    def lab_color_from_value(v: float):
-        try:
-            x = float(v)
-        except Exception:
-            return [160, 160, 160, 180]
-        if pd.isna(x) or x < 0:
-            return [160, 160, 160, 180]
-        if x < 10: return [46, 204, 113, 220]
-        if x < 100: return [52, 152, 219, 220]
-        if x < 1000: return [243, 156, 18, 220]
-        return [231, 76, 60, 220]
-    for d in (bh_priv, bh_gov):
-        if not d.empty:
-            lab_vals = pd.to_numeric(d.get('lab_total_coliform_CFU_per_100mL', np.nan), errors='coerce')
-            d['lab_color_rgba'] = lab_vals.apply(lab_color_from_value)
-
-    def color_from_cat(c: str):
-        c = (c or '').lower()
-        if c == 'low': return [46, 204, 113, 200]      # green
-        if c == 'moderate': return [52, 152, 219, 200] # blue
-        if c == 'high': return [243, 156, 18, 200]     # orange
-        if c == 'very high': return [231, 76, 60, 200] # red
-        return [160, 160, 160, 200]                    # gray
+    # Limit number of points to keep first render fast (override via env FIO_MAX_POINTS)
+    try:
+        max_points = int(os.environ.get('FIO_MAX_POINTS', '8000'))
+    except Exception:
+        max_points = 8000
+    def limit_points(df: pd.DataFrame) -> pd.DataFrame:
+        if df is None or df.empty:
+            return df
+        if len(df) <= max_points:
+            return df
+        col = 'concentration_CFU_per_100mL'
+        if col in df.columns:
+            try:
+                return df.nlargest(max_points, col)
+            except Exception:
+                return df.head(max_points)
+        return df.head(max_points)
+    bh_priv = limit_points(bh_priv)
+    bh_gov = limit_points(bh_gov)
 
     # Use fixed marker sizes (private: 5 px, government: 7 px) so only color varies by concentration
-    for d in (bh_priv, bh_gov):
-        if not d.empty:
-            d['color_rgba'] = d['conc_category'].apply(color_from_cat)
     if not bh_priv.empty:
-        try:
-            bh_priv['size_px'] = float(5.0)
-        except Exception:
-            bh_priv['size_px'] = 5.0
+        bh_priv['size_px'] = 5.0
     if not bh_gov.empty:
-        try:
-            bh_gov['size_px'] = float(7.0)
-        except Exception:
-            bh_gov['size_px'] = 7.0
+        bh_gov['size_px'] = 7.0
     # Government layer already uses a black stroke in the ScatterplotLayer config below
 
     layers = []
@@ -338,9 +339,14 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
         except Exception:
             pass
 
-    # Unified tooltip content for all pickable layers
+    # Unified tooltip using token references to avoid per-row string builds
     tooltip = {
-        'html': '{tooltip_html}',
+        'html': (
+            '<div><b>{borehole_id}</b> <small>({borehole_type})</small><br>'
+            'Concentration (model): <b>{concentration_CFU_per_100mL}</b> CFU/100mL<br>'
+            'Lab Total Coliform: <b>{lab_total_coliform_CFU_per_100mL}</b> CFU/100mL'
+            '</div>'
+        ),
         'style': {
             'backgroundColor': 'rgba(255,255,255,0.95)',
             'color': '#111',
@@ -474,26 +480,44 @@ def main():
                 fio_runner.run_scenario(scenario_payload)
         st.success('Scenario outputs updated.')
 
-    outs = _load_outputs()
+    # Progressive load: small subset for first paint, then full in background
+    outs = _load_outputs(nrows=5000)
     # Heatmap radius removed
     toggled = _legend_and_toggles({
         'show_private': bool(tuned.get('show_private', True)),
         'show_government': bool(tuned.get('show_government', True)),
         'show_ward_boundaries': bool(tuned.get('show_ward_boundaries', False)),
     })
-    deck = _webgl_deck(
-        outs['priv_bh_dash'],
-        outs['gov_bh_dash'],
-        outs['hh_loads_markers'],
-        show_private=bool(toggled.get('show_private', True)),
-        show_government=bool(toggled.get('show_government', True)),
-        
-        show_ward_load=False,
-        show_ward_boundaries=bool(toggled.get('show_ward_boundaries', False)),
-        highlight_borehole_id=tuned.get('highlight_borehole_id'),
-        zoom_to_highlight=bool(tuned.get('zoom_to_highlight', True))
-    )
-    st.pydeck_chart(deck, use_container_width=True)
+    with st.spinner('Rendering map...'):
+        deck = _webgl_deck(
+            outs['priv_bh_dash'],
+            outs['gov_bh_dash'],
+            show_private=bool(toggled.get('show_private', True)),
+            show_government=bool(toggled.get('show_government', True)),
+            show_ward_load=False,
+            show_ward_boundaries=bool(toggled.get('show_ward_boundaries', False)),
+            highlight_borehole_id=tuned.get('highlight_borehole_id'),
+            zoom_to_highlight=bool(tuned.get('zoom_to_highlight', True))
+        )
+        chart = st.pydeck_chart(deck, use_container_width=True)
+
+    # After first paint, load full data and update chart if larger
+    try:
+        full_outs = _load_outputs(nrows=None)
+        if len(full_outs['priv_bh_dash']) > len(outs['priv_bh_dash']) or len(full_outs['gov_bh_dash']) > len(outs['gov_bh_dash']):
+            deck2 = _webgl_deck(
+                full_outs['priv_bh_dash'],
+                full_outs['gov_bh_dash'],
+                show_private=bool(toggled.get('show_private', True)),
+                show_government=bool(toggled.get('show_government', True)),
+                show_ward_load=False,
+                show_ward_boundaries=bool(toggled.get('show_ward_boundaries', False)),
+                highlight_borehole_id=tuned.get('highlight_borehole_id'),
+                zoom_to_highlight=bool(tuned.get('zoom_to_highlight', True))
+            )
+            chart.pydeck_chart(deck2, use_container_width=True)
+    except Exception:
+        pass
 
     # Charts removed per request
 
