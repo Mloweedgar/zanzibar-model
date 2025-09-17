@@ -199,9 +199,9 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, *, show_private: bo
 
     # Limit number of points to keep first render fast (override via env FIO_MAX_POINTS)
     try:
-        max_points = int(os.environ.get('FIO_MAX_POINTS', '8000'))
+        max_points = int(os.environ.get('FIO_MAX_POINTS', '3000'))
     except Exception:
-        max_points = 8000
+        max_points = 3000
     def limit_points(df: pd.DataFrame) -> pd.DataFrame:
         if df is None or df.empty:
             return df
@@ -517,9 +517,9 @@ def main():
     # Create placeholder for progressive loading
     map_placeholder = st.empty()
 
-    # PROGRESSIVE LOADING: First paint with small subset (5000 rows)
+    # PROGRESSIVE LOADING: First paint with small subset (6000 rows)
     with st.spinner('Loading initial data...'):
-        outs = _load_outputs(nrows=5000)
+        outs = _load_outputs(nrows=6000)
     
     with st.spinner('Rendering map...'):
         deck = _webgl_deck(
