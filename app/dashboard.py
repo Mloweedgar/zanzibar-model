@@ -78,11 +78,16 @@ def _format_large(x) -> str:
 @st.cache_data(show_spinner=False)
 def _load_outputs(nrows: Optional[int] = None) -> Dict[str, pd.DataFrame]:
     outputs = {}
-    # Only load what is needed for the map
-    cols_needed = [
+    # Only load what is needed for the map - core columns that should exist in both files
+    cols_core = [
         'borehole_id','borehole_type','lat','long',
-        'concentration_CFU_per_100mL','lab_total_coliform_CFU_per_100mL',
-        'lab_e_coli_CFU_per_100mL','Q_L_per_day'
+        'concentration_CFU_per_100mL','Q_L_per_day'
+    ]
+    # Optional columns that may exist in some files
+    cols_optional = [
+        'lab_total_coliform_CFU_per_100mL',
+        'lab_e_coli_CFU_per_100mL',
+        'total_surviving_fio_load'
     ]
     dtype_map = {
         'borehole_id': 'object',
@@ -93,6 +98,7 @@ def _load_outputs(nrows: Optional[int] = None) -> Dict[str, pd.DataFrame]:
         'lab_total_coliform_CFU_per_100mL': 'float64',
         'lab_e_coli_CFU_per_100mL': 'float64',
         'Q_L_per_day': 'float64',
+        'total_surviving_fio_load': 'float64',
     }
     if nrows is None:
         try:
@@ -106,26 +112,34 @@ def _load_outputs(nrows: Optional[int] = None) -> Dict[str, pd.DataFrame]:
     ):
         if path.exists():
             try:
-                outputs[key] = pd.read_csv(
+                # First, try loading with pyarrow - don't restrict columns upfront
+                df = pd.read_csv(
                     path,
-                    usecols=lambda c: c in cols_needed,
-                    dtype=dtype_map,
                     nrows=nrows,
                     engine='pyarrow',
+                    dtype={k: v for k, v in dtype_map.items() if k in cols_core}
                 )
+                # Filter to available columns after loading
+                available_cols = [c for c in cols_core + cols_optional if c in df.columns]
+                outputs[key] = df[available_cols]
             except Exception:
                 try:
-                    outputs[key] = pd.read_csv(
+                    # Fallback to pandas default
+                    df = pd.read_csv(
                         path,
-                        usecols=lambda c: c in cols_needed,
-                        dtype=dtype_map,
                         nrows=nrows,
                         low_memory=False,
+                        dtype={k: v for k, v in dtype_map.items() if k in cols_core}
                     )
+                    # Filter to available columns after loading
+                    available_cols = [c for c in cols_core + cols_optional if c in df.columns]
+                    outputs[key] = df[available_cols]
                 except Exception:
+                    # Final fallback: load everything, no dtype constraints
                     outputs[key] = pd.read_csv(path, nrows=nrows)
         else:
-            outputs[key] = pd.DataFrame(columns=cols_needed)
+            # Create empty DataFrame with core columns if file doesn't exist
+            outputs[key] = pd.DataFrame(columns=cols_core)
     return outputs
 
 
@@ -291,15 +305,19 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, *, show_private: bo
         mapbox_token = None
     if not mapbox_token:
         mapbox_token = os.environ.get('MAPBOX_API_KEY') or os.environ.get('MAPBOX_TOKEN')
+    
     if mapbox_token:
         map_provider = 'mapbox'
         map_style = 'mapbox://styles/mapbox/light-v9'
     else:
         map_provider = 'carto'
         map_style = 'light'
-        st.info('Using fallback basemap (Carto). Set MAPBOX_API_KEY to enable Mapbox.')
+        # Only show fallback message once using session state
+        if 'mapbox_fallback_shown' not in st.session_state:
+            st.info('Using fallback basemap (Carto). Set MAPBOX_API_KEY to enable Mapbox.')
+            st.session_state.mapbox_fallback_shown = True
 
-    # Add lightweight ward outline only when enabled to avoid heavy startup
+    # LAZY LOAD: Only load ward boundaries when enabled (avoid heavy startup I/O)
     if bool(show_ward_boundaries):
         try:
             p = config.INPUT_DATA_DIR / 'wards.geojson'
@@ -337,6 +355,7 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, *, show_private: bo
                     id='layer-ward-outline'
                 ))
         except Exception:
+            # Graceful fallback: continue without ward boundaries if loading fails
             pass
 
     # Unified tooltip using token references to avoid per-row string builds
@@ -453,6 +472,7 @@ def _legend_and_toggles(defaults: Dict[str, bool]) -> Dict[str, bool]:
 def main():
     st.set_page_config(page_title='FIO Scenarios', layout='wide')
 
+    # FAST FIRST RENDER: Show sidebar and legend immediately
     sel = _scenario_selector()
     tuned = _tunable_controls(sel['params'])
 
@@ -480,14 +500,20 @@ def main():
                 fio_runner.run_scenario(scenario_payload)
         st.success('Scenario outputs updated.')
 
-    # Progressive load: small subset for first paint, then full in background
-    outs = _load_outputs(nrows=5000)
-    # Heatmap radius removed
+    # Show legend and toggles BEFORE loading data (for responsive UI)
     toggled = _legend_and_toggles({
         'show_private': bool(tuned.get('show_private', True)),
         'show_government': bool(tuned.get('show_government', True)),
         'show_ward_boundaries': bool(tuned.get('show_ward_boundaries', False)),
     })
+
+    # Create placeholder for progressive loading
+    map_placeholder = st.empty()
+
+    # PROGRESSIVE LOADING: First paint with small subset (5000 rows)
+    with st.spinner('Loading initial data...'):
+        outs = _load_outputs(nrows=5000)
+    
     with st.spinner('Rendering map...'):
         deck = _webgl_deck(
             outs['priv_bh_dash'],
@@ -499,13 +525,17 @@ def main():
             highlight_borehole_id=tuned.get('highlight_borehole_id'),
             zoom_to_highlight=bool(tuned.get('zoom_to_highlight', True))
         )
-        chart = st.pydeck_chart(deck, use_container_width=True)
+        # Use placeholder for initial render
+        map_placeholder.pydeck_chart(deck, use_container_width=True)
 
-    # After first paint, load full data and update chart if larger
+    # BACKGROUND UPGRADE: Load full data and update in place (no rerun)
     try:
-        full_outs = _load_outputs(nrows=None)
+        with st.spinner('Loading full dataset...'):
+            full_outs = _load_outputs(nrows=None)
+        
+        # Only update if we have more data
         if len(full_outs['priv_bh_dash']) > len(outs['priv_bh_dash']) or len(full_outs['gov_bh_dash']) > len(outs['gov_bh_dash']):
-            deck2 = _webgl_deck(
+            deck_full = _webgl_deck(
                 full_outs['priv_bh_dash'],
                 full_outs['gov_bh_dash'],
                 show_private=bool(toggled.get('show_private', True)),
@@ -515,8 +545,10 @@ def main():
                 highlight_borehole_id=tuned.get('highlight_borehole_id'),
                 zoom_to_highlight=bool(tuned.get('zoom_to_highlight', True))
             )
-            chart.pydeck_chart(deck2, use_container_width=True)
+            # Update the same placeholder (no page rerun)
+            map_placeholder.pydeck_chart(deck_full, use_container_width=True)
     except Exception:
+        # Graceful fallback: continue with subset if full load fails
         pass
 
     # Charts removed per request
