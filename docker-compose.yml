@@ -5,6 +5,7 @@ services:
     container_name: fio_streamlit
     environment:
       - MAPBOX_API_KEY=${MAPBOX_API_KEY}
+      - PYTHONPATH=/app
       - FIO_MAX_POINTS=3000
       - FIO_READ_NROWS=6000
     expose:

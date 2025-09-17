@@ -14,8 +14,11 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY . /app
 
-# Defaults for fast first paint; override at runtime as needed
-ENV STREAMLIT_SERVER_HEADLESS=true \
+# Ensure package imports like `import app` resolve
+ENV PYTHONPATH=/app \
+    \
+    # Defaults for fast first paint; override at runtime as needed
+    STREAMLIT_SERVER_HEADLESS=true \
     FIO_MAX_POINTS=3000 \
     FIO_READ_NROWS=6000
 
