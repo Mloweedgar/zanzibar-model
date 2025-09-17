@@ -535,28 +535,27 @@ def main():
         # Use placeholder for initial render
         map_placeholder.pydeck_chart(deck, use_container_width=True)
 
-    # BACKGROUND UPGRADE: Load full data and update in place (no rerun)
-    try:
-        with st.spinner('Loading full dataset...'):
+    # BACKGROUND UPGRADE: Only if user explicitly requests full resolution
+    if bool(toggled.get('full_resolution', False)):
+        try:
             full_outs = _load_outputs(nrows=None)
-        
-        # Only update if we have more data
-        if len(full_outs['priv_bh_dash']) > len(outs['priv_bh_dash']) or len(full_outs['gov_bh_dash']) > len(outs['gov_bh_dash']):
-            deck_full = _webgl_deck(
-                full_outs['priv_bh_dash'],
-                full_outs['gov_bh_dash'],
-                show_private=bool(toggled.get('show_private', True)),
-                show_government=bool(toggled.get('show_government', True)),
-                show_ward_load=False,
-                show_ward_boundaries=bool(toggled.get('show_ward_boundaries', False)),
-                highlight_borehole_id=tuned.get('highlight_borehole_id'),
-                zoom_to_highlight=bool(tuned.get('zoom_to_highlight', True))
-            )
-            # Update the same placeholder (no page rerun)
-            map_placeholder.pydeck_chart(deck_full, use_container_width=True)
-    except Exception:
-        # Graceful fallback: continue with subset if full load fails
-        pass
+            # Only update if we have more data
+            if len(full_outs['priv_bh_dash']) > len(outs['priv_bh_dash']) or len(full_outs['gov_bh_dash']) > len(outs['gov_bh_dash']):
+                deck_full = _webgl_deck(
+                    full_outs['priv_bh_dash'],
+                    full_outs['gov_bh_dash'],
+                    show_private=bool(toggled.get('show_private', True)),
+                    show_government=bool(toggled.get('show_government', True)),
+                    show_ward_load=False,
+                    show_ward_boundaries=bool(toggled.get('show_ward_boundaries', False)),
+                    highlight_borehole_id=tuned.get('highlight_borehole_id'),
+                    zoom_to_highlight=bool(tuned.get('zoom_to_highlight', True))
+                )
+                # Update the same placeholder (no page rerun)
+                map_placeholder.pydeck_chart(deck_full, use_container_width=True)
+        except Exception:
+            # Graceful fallback: continue with subset if full load fails
+            pass
 
     # Charts removed per request
 
