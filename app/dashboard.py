@@ -197,6 +197,33 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
             bh_gov['size_px'] = 7.0
     # Government layer already uses a black stroke in the ScatterplotLayer config below
 
+    # Limit number of points to reduce websocket payload
+    try:
+        _max_pts = int(os.environ.get('FIO_MAX_POINTS', '3000'))
+    except Exception:
+        _max_pts = 3000
+    def _limit_rows(df: pd.DataFrame) -> pd.DataFrame:
+        if df is None or df.empty:
+            return df
+        if len(df) <= _max_pts:
+            return df
+        col = 'concentration_CFU_per_100mL'
+        if col in df.columns:
+            try:
+                return df.nlargest(_max_pts, col)
+            except Exception:
+                return df.head(_max_pts)
+        return df.head(_max_pts)
+    bh_priv = _limit_rows(bh_priv)
+    bh_gov = _limit_rows(bh_gov)
+
+    # Reduce columns sent to the browser (pydeck payload)
+    _keep_cols = ['long','lat','color_rgba','size_px','borehole_id','borehole_type','concentration_CFU_per_100mL','lab_total_coliform_CFU_per_100mL']
+    if not bh_priv.empty:
+        bh_priv = bh_priv[[c for c in _keep_cols if c in bh_priv.columns]].copy()
+    if not bh_gov.empty:
+        bh_gov = bh_gov[[c for c in _keep_cols if c in bh_gov.columns]].copy()
+
     layers = []
     # Always create layers with explicit visibility; toggles control 'visible'
     if not bh_priv.empty:
