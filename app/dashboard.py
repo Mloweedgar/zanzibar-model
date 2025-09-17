@@ -466,10 +466,13 @@ def _legend_and_toggles(defaults: Dict[str, bool]) -> Dict[str, bool]:
             show_government = st.checkbox('Pathogens Concentration - ZAWA Boreholes', value=bool(defaults.get('show_government', True)))
         with col3:
             show_ward_boundaries = st.checkbox('Ward boundaries', value=bool(defaults.get('show_ward_boundaries', False)))
+        # Optional performance toggle for full dataset rendering
+        full_resolution = st.checkbox('Full resolution map (may be slow)', value=False)
         return {
             'show_private': bool(show_private),
             'show_government': bool(show_government),
             'show_ward_boundaries': bool(show_ward_boundaries),
+            'full_resolution': bool(full_resolution),
         }
 
 
