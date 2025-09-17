@@ -11,12 +11,17 @@ import numpy as np
 import pydeck as pdk
  
 
-# Support both package and script execution
-try:
-    from app import fio_config as config  # when executed as a script by Streamlit
+# Robust imports for both script and package execution
+if __package__ in (None, ''):
+    import sys as _sys
+    THIS_DIR = Path(__file__).resolve().parent
+    PARENT_DIR = THIS_DIR.parent
+    if str(PARENT_DIR) not in _sys.path:
+        _sys.path.insert(0, str(PARENT_DIR))
+    from app import fio_config as config
     from app import fio_runner
-except Exception:
-    from . import fio_config as config  # when imported as a package
+else:
+    from . import fio_config as config
     from . import fio_runner
 
 
