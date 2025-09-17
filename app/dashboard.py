@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 import os
 import json
+from functools import lru_cache
 
 import streamlit as st
 import pandas as pd
@@ -25,28 +26,35 @@ else:
     from . import fio_runner
 
 
+@lru_cache(maxsize=1)
 def _get_model_thresholds() -> tuple[float, float, float]:
-    """Strictly load model-side thresholds (CFU/100mL) from calibration_mapping.json.
+    """Load model-side thresholds (CFU/100mL).
 
-    Raises if the file or required fields are missing/invalid.
+    Falls back to sensible defaults if calibration file is missing/invalid
+    so the app can start and display data with default bins.
     """
+    default_thresholds = (1e2, 1e3, 1e4)
     p = config.OUTPUT_DATA_DIR / 'calibration_mapping.json'
-    if not p.exists():
-        raise FileNotFoundError(f"Expected thresholds at {p}; run calibration to create this file.")
-    with open(p, 'r', encoding='utf-8') as fh:
-        data = json.load(fh)
-    node = data.get('category_thresholds_model_CFU_per_100mL')
-    if not isinstance(node, dict):
-        raise KeyError("Missing 'category_thresholds_model_CFU_per_100mL' in calibration_mapping.json")
     try:
-        t1 = float(node['Low_Upper'])
-        t2 = float(node['Moderate_Upper'])
-        t3 = float(node['High_Upper'])
-    except Exception as e:
-        raise KeyError("Threshold fields Low_Upper/Moderate_Upper/High_Upper not found or not numeric") from e
-    if not (t1 > 0 and t2 > t1 and t3 > t2):
-        raise ValueError("Thresholds must be strictly increasing and positive")
-    return (t1, t2, t3)
+        if not p.exists():
+            st.info("Using default thresholds. Run calibration to enable model-calibrated bins.")
+            return default_thresholds
+        with open(p, 'r', encoding='utf-8') as fh:
+            data = json.load(fh)
+        node = data.get('category_thresholds_model_CFU_per_100mL')
+        if not isinstance(node, dict):
+            st.warning("Missing thresholds in calibration_mapping.json; using defaults.")
+            return default_thresholds
+        t1 = float(node.get('Low_Upper', default_thresholds[0]))
+        t2 = float(node.get('Moderate_Upper', default_thresholds[1]))
+        t3 = float(node.get('High_Upper', default_thresholds[2]))
+        if not (t1 > 0 and t2 > t1 and t3 > t2):
+            st.warning("Invalid thresholds in calibration; using defaults.")
+            return default_thresholds
+        return (t1, t2, t3)
+    except Exception:
+        st.warning("Failed to load thresholds; using defaults.")
+        return default_thresholds
 
 def _format_large(x) -> str:
     # Robust formatter: accepts numbers or numeric strings; returns '-' if not parseable
@@ -67,6 +75,7 @@ def _format_large(x) -> str:
         return "-"
 
 
+@st.cache_data(show_spinner=False)
 def _load_outputs() -> Dict[str, pd.DataFrame]:
     outputs = {}
     paths = {
@@ -273,9 +282,7 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
 
     # Ward boundaries and choropleth removed; we'll add a lightweight hover-only outline below
 
-    # Map style handling: always use Mapbox; require token from secrets or env
-    map_style = 'mapbox://styles/mapbox/light-v9'
-    map_provider = 'mapbox'
+    # Map style handling with graceful fallback when MAPBOX token is missing
     mapbox_token = None
     try:
         mapbox_token = st.secrets.get('MAPBOX_API_KEY')  # type: ignore[attr-defined]
@@ -283,48 +290,53 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
         mapbox_token = None
     if not mapbox_token:
         mapbox_token = os.environ.get('MAPBOX_API_KEY') or os.environ.get('MAPBOX_TOKEN')
-    if not mapbox_token:
-        st.error('Missing Mapbox token. Please set MAPBOX_API_KEY in Streamlit secrets or environment.')
-        st.stop()
+    if mapbox_token:
+        map_provider = 'mapbox'
+        map_style = 'mapbox://styles/mapbox/light-v9'
+    else:
+        map_provider = 'carto'
+        map_style = 'light'
+        st.info('Using fallback basemap (Carto). Set MAPBOX_API_KEY to enable Mapbox.')
 
-    # Add lightweight ward outline with hover-tooltips (ward name)
-    try:
-        p = config.INPUT_DATA_DIR / 'wards.geojson'
-        if p.exists():
-            with open(p, 'r', encoding='utf-8') as fh:
-                wards_geo = json.load(fh)
-            # Flatten fields for tooltip token replacement (avoid nested properties path)
-            try:
-                feats = wards_geo.get('features', [])
-                for f in feats:
-                    props = f.get('properties') or {}
-                    f['ward_label'] = props.get('ward_name') or ''
-                    f['div_name'] = props.get('div_name') or ''
-                    f['counc_name'] = props.get('counc_name') or ''
-                    f['dist_name'] = props.get('dist_name') or ''
-                    f['reg_name'] = props.get('reg_name') or ''
-                    f['tooltip_html'] = (
-                        f"<div><b>{f['ward_label']}</b><br><small>"
-                        f"Division: {f['div_name']} &nbsp;•&nbsp; Council: {f['counc_name']}<br>"
-                        f"District: {f['dist_name']} &nbsp;•&nbsp; Region: {f['reg_name']}"
-                        f"</small></div>"
-                    )
-            except Exception:
-                pass
-            layers.append(pdk.Layer(
-                'GeoJsonLayer',
-                data=wards_geo,
-                stroked=True,
-                filled=True,
-                get_fill_color='[0,0,0,0]',
-                get_line_color='[40,40,40,160]',
-                line_width_min_pixels=1,
-                pickable=True,
-                visible=bool(show_ward_boundaries),
-                id='layer-ward-outline'
-            ))
-    except Exception:
-        pass
+    # Add lightweight ward outline only when enabled to avoid heavy startup
+    if bool(show_ward_boundaries):
+        try:
+            p = config.INPUT_DATA_DIR / 'wards.geojson'
+            if p.exists():
+                with open(p, 'r', encoding='utf-8') as fh:
+                    wards_geo = json.load(fh)
+                # Flatten fields for tooltip token replacement (avoid nested properties path)
+                try:
+                    feats = wards_geo.get('features', [])
+                    for f in feats:
+                        props = f.get('properties') or {}
+                        f['ward_label'] = props.get('ward_name') or ''
+                        f['div_name'] = props.get('div_name') or ''
+                        f['counc_name'] = props.get('counc_name') or ''
+                        f['dist_name'] = props.get('dist_name') or ''
+                        f['reg_name'] = props.get('reg_name') or ''
+                        f['tooltip_html'] = (
+                            f"<div><b>{f['ward_label']}</b><br><small>"
+                            f"Division: {f['div_name']} &nbsp;•&nbsp; Council: {f['counc_name']}<br>"
+                            f"District: {f['dist_name']} &nbsp;•&nbsp; Region: {f['reg_name']}"
+                            f"</small></div>"
+                        )
+                except Exception:
+                    pass
+                layers.append(pdk.Layer(
+                    'GeoJsonLayer',
+                    data=wards_geo,
+                    stroked=True,
+                    filled=True,
+                    get_fill_color='[0,0,0,0]',
+                    get_line_color='[40,40,40,160]',
+                    line_width_min_pixels=1,
+                    pickable=True,
+                    visible=True,
+                    id='layer-ward-outline'
+                ))
+        except Exception:
+            pass
 
     # Unified tooltip content for all pickable layers
     tooltip = {
@@ -346,8 +358,11 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
         map_provider=map_provider,
         tooltip=tooltip,
     )
-    if mapbox_token:
-        deck.mapbox_key = mapbox_token
+    try:
+        if mapbox_token and hasattr(deck, 'mapbox_key'):
+            deck.mapbox_key = mapbox_token
+    except Exception:
+        pass
     return deck
 
 
