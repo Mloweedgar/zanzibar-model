@@ -10,6 +10,8 @@ services:
       - FIO_READ_NROWS=6000
     expose:
       - "8501"
+    volumes:
+      - ../.streamlit/secrets.toml:/root/.streamlit/secrets.toml:ro
   nginx:
     image: nginx:alpine
     depends_on:
