@@ -16,8 +16,8 @@ Place the following CSVs in `data/input/`:
 ### 3) Preprocess boreholes (derive Q_L_per_day)
 Derive and save `Q_L_per_day` to enriched files used by the pipeline:
 ```bash
-python man.py derive-private-q
-python man.py derive-government-q
+python main.py derive-private-q
+python main.py derive-government-q
 ```
 This writes:
 - `data/derived/private_boreholes_enriched.csv`
@@ -25,13 +25,13 @@ This writes:
 
 Optional (for inspection only):
 ```bash
-python man.py inspect-private-q
+python main.py inspect-private-q
 ```
 Writes unique value summaries to `data/output/`.
 
 ### 4) Run the pipeline
 ```bash
-python man.py pipeline --scenario crisis_2025_current
+python main.py pipeline --scenario crisis_2025_current
 ```
 - `--scenario` accepts either a scenario name defined in `app/fio_config.py` or a JSON string with overrides.
 
@@ -44,7 +44,7 @@ Key outputs (written to `data/output/` unless noted):
 
 ### 5) Launch the dashboard
 ```bash
-python man.py dashboard
+python main.py dashboard
 ```
 Opens a Streamlit app (defaults to port 8502). Use the sidebar to adjust interventions and rerun.
 

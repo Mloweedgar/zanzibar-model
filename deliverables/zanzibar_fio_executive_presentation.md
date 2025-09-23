@@ -395,15 +395,15 @@
 pip install pandas geopandas matplotlib folium streamlit scikit-learn
 
 # Preprocess data  
-python man.py derive-private-q
-python man.py derive-government-q
+python main.py derive-private-q
+python main.py derive-government-q
 
 # Run baseline scenario
-python man.py pipeline --scenario calibrated_trend_baseline
+python main.py pipeline --scenario calibrated_trend_baseline
 
 # Execute calibration
-python man.py calibrate
-python man.py trend
+python main.py calibrate
+python main.py trend
 ```
 
 **Output Files:** Concentration maps, validation metrics, scenario results available in `data/output/`

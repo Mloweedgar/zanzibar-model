@@ -2,8 +2,8 @@
 """Entrypoint for FIO app: run pipeline or launch dashboard.
 
 Usage:
-  python man.py pipeline [--scenario JSON_OR_NAME]
-  python man.py dashboard
+  python main.py pipeline [--scenario JSON_OR_NAME]
+  python main.py dashboard
 """
 
 import sys
@@ -85,3 +85,5 @@ def main() -> int:
 
 if __name__ == '__main__':
     sys.exit(main())
+
+
