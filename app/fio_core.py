@@ -122,7 +122,7 @@ def compute_layer1_loads(df: pd.DataFrame, EFIO: float) -> pd.DataFrame:
     df['fio_load'] = (
         df['household_population'] * EFIO * (1 - df['pathogen_containment_efficiency'])
     )
-    df[['id', 'lat', 'long', 'fio_load']].to_csv(config.NET_PATHOGEN_LOAD_PATH, index=False)
+    df[['id', 'lat', 'long', 'toilet_category_id', 'fio_load']].to_csv(config.NET_PATHOGEN_LOAD_PATH, index=False)
     logging.info(f"Saved net pathogen load to {config.NET_PATHOGEN_LOAD_PATH} ({len(df)} records)")
     return df
 

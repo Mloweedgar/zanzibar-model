@@ -3,7 +3,9 @@
 
 Usage:
   python main.py pipeline [--scenario JSON_OR_NAME]
+  python main.py nitrogen-pipeline [--scenario JSON_OR_NAME]
   python main.py dashboard
+  python main.py nitrogen-dashboard
 """
 
 import sys
@@ -12,6 +14,7 @@ import argparse
 from pathlib import Path
 
 from app import fio_runner
+from app import n_runner
 
 
 def main() -> int:
@@ -22,7 +25,13 @@ def main() -> int:
     p1.add_argument('--scenario', default='crisis_2025_current')
     p1.add_argument('--log-level', default='INFO', choices=['DEBUG','INFO','WARNING','ERROR'])
 
+    p1n = sub.add_parser('nitrogen-pipeline')
+    p1n.add_argument('--scenario', default='crisis_2025_current')
+    p1n.add_argument('--log-level', default='INFO', choices=['DEBUG','INFO','WARNING','ERROR'])
+
     p2 = sub.add_parser('dashboard')
+    p2n = sub.add_parser('nitrogen-dashboard')
+    p2t = sub.add_parser('toilet-dashboard')
     p3 = sub.add_parser('inspect-private-q')
     p4 = sub.add_parser('derive-private-q')
     p5 = sub.add_parser('derive-government-q')
@@ -42,10 +51,30 @@ def main() -> int:
             pass
         fio_runner.run_scenario(scenario)
         return 0
+    if args.cmd == 'nitrogen-pipeline':
+        n_runner.setup_logging(args.log_level)
+        scenario = args.scenario
+        try:
+            if isinstance(scenario, str) and scenario.startswith('{') and scenario.endswith('}'):
+                scenario = json.loads(scenario)
+        except json.JSONDecodeError:
+            pass
+        n_runner.run_scenario(scenario)
+        return 0
     if args.cmd == 'dashboard':
         # Launch Streamlit by module to ensure package context
         import subprocess
         subprocess.run([sys.executable, "-m", "streamlit", "run", "app/dashboard.py", "--server.port", "8502"], check=False)
+        return 0
+    if args.cmd == 'nitrogen-dashboard':
+        # Launch nitrogen dashboard directly
+        import subprocess
+        subprocess.run([sys.executable, "-m", "streamlit", "run", "app/nitrogen_dashboard.py", "--server.port", "8503"], check=False)
+        return 0
+    if args.cmd == 'toilet-dashboard':
+        # Launch toilet types dashboard directly
+        import subprocess
+        subprocess.run([sys.executable, "-m", "streamlit", "run", "app/toilet_types_dashboard.py", "--server.port", "8504"], check=False)
         return 0
     if args.cmd == 'inspect-private-q':
         from app.preprocess_boreholes import extract_private_q_uniques

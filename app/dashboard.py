@@ -407,6 +407,7 @@ def _legend_and_toggles(defaults: Dict[str, bool]) -> Dict[str, bool]:
     </div>
     """ % {'t1s': t1s, 't2s': t2s, 't3s': t3s}
         st.markdown(html, unsafe_allow_html=True)
+        
         # Streamlit toggles just below legend
         col1, col2, col3 = st.columns([3, 3, 2])
         with col1:
@@ -423,7 +424,34 @@ def _legend_and_toggles(defaults: Dict[str, bool]) -> Dict[str, bool]:
 
 
 def main():
-    st.set_page_config(page_title='FIO Scenarios', layout='wide')
+    st.set_page_config(page_title='Zanzibar Sanitation Model', layout='wide')
+    
+    # Dashboard selector
+    st.sidebar.title("🗺️ Zanzibar Sanitation Model")
+    dashboard_type = st.sidebar.radio(
+        "Select Dashboard:",
+        ["Pathogen Model", "Nitrogen Model", "Toilet Types"],
+        index=0
+    )
+    
+    if dashboard_type == "Nitrogen Model":
+        # Import and run nitrogen dashboard
+        try:
+            from . import nitrogen_dashboard
+        except ImportError:
+            # Fallback for direct execution
+            import nitrogen_dashboard
+        nitrogen_dashboard.main()
+        return
+
+    if dashboard_type == "Toilet Types":
+        # Import and run toilet types dashboard
+        try:
+            from . import toilet_types_dashboard
+        except ImportError:
+            import toilet_types_dashboard
+        toilet_types_dashboard.main()
+        return
 
     sel = _scenario_selector()
     tuned = _tunable_controls(sel['params'])

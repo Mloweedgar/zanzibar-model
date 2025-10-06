@@ -1,0 +1,20 @@
+{
+  "scenario_name": "crisis_2025_current",
+  "parameters": {
+    "label": "Current situation (status quo)",
+    "description": "No interventions applied.",
+    "pop_factor": 1.0,
+    "EFIO_override": 8960000000.0,
+    "ks_per_m": 0.003,
+    "radius_by_type": {
+      "private": 35,
+      "government": 100
+    },
+    "od_reduction_percent": 0.0,
+    "infrastructure_upgrade_percent": 0.0,
+    "centralized_treatment_enabled": false,
+    "fecal_sludge_treatment_percent": 0.0
+  },
+  "timestamp": "2025-10-06T07:05:28.669978Z",
+  "model_type": "nitrogen"
+}

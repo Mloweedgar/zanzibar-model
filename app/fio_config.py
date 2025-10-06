@@ -8,6 +8,10 @@ EFIO_DEFAULT = 8.96e9
 HOUSEHOLD_POPULATION_DEFAULT = 10
 KS_PER_M_DEFAULT = 0.003
 
+# === NITROGEN PARAMETERS ===
+PROTEIN_PER_CAPITA_DEFAULT = 0.08  # kg protein per person per day
+PROTEIN_TO_NITROGEN_CONVERSION = 0.16  # kg N per kg protein
+
 # === CONTAINMENT EFFICIENCY MAP ===
 CONTAINMENT_EFFICIENCY_DEFAULT = {
     1: 0.50, # Sewered systems (calibrated)
@@ -77,17 +81,17 @@ SCENARIOS = {
         'centralized_treatment_enabled': False,
         'fecal_sludge_treatment_percent': 60.0,
     },
-    'hotel_coastal_belt_compliance': {
-        'label': 'Hotels & coastal belt compliance upgrades',
-        'description': 'Improve on-site treatment and reduce leaks near coast.',
+    'open_defecation_reduction': {
+        'label': 'Open Defecation reduction',
+        'description': 'Reduce open defecation through behavior change and basic facility provision.',
         'pop_factor': 1.0,
         'EFIO_override': EFIO_DEFAULT,
         'ks_per_m': KS_PER_M_DEFAULT,
         'radius_by_type': RADIUS_BY_TYPE_DEFAULT.copy(),
-        'od_reduction_percent': 20.0,
-        'infrastructure_upgrade_percent': 50.0,
+        'od_reduction_percent': 30.0,
+        'infrastructure_upgrade_percent': 0.0,
         'centralized_treatment_enabled': False,
-        'fecal_sludge_treatment_percent': 30.0,
+        'fecal_sludge_treatment_percent': 0.0,
     },
 }
 
@@ -107,6 +111,7 @@ GOVERNMENT_Q_L_PER_DAY_DEFAULT = 20000.0
 
 SANITATION_STANDARDIZED_PATH = DERIVED_DATA_DIR / 'sanitation_type_with_population.csv'
 NET_PATHOGEN_LOAD_PATH = DERIVED_DATA_DIR / 'net_pathogen_load_from_households.csv'
+NET_NITROGEN_LOAD_PATH = DERIVED_DATA_DIR / 'net_nitrogen_load_from_households.csv'
 PRIVATE_BOREHOLES_WITH_ID_PATH = DERIVED_DATA_DIR / 'private_boreholes_with_id.csv'
 GOVERNMENT_BOREHOLES_WITH_ID_PATH = DERIVED_DATA_DIR / 'government_boreholes_with_id.csv'
 NET_SURVIVING_PATHOGEN_LOAD_LINKS_PATH = OUTPUT_DATA_DIR / 'net_surviving_pathogen_load_links.csv'
