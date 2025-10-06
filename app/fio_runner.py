@@ -127,10 +127,9 @@ def run_scenario(scenario: Union[Dict[str, Any], str] = 'crisis_2025_current') -
         pd.DataFrame().to_csv(config.DASH_GOVERNMENT_BH_PATH, index=False)
 
     hh = df_with_loads[['id','lat','long','fio_load']].dropna(subset=['lat','long']).copy()
-    markers = hh.nlargest(min(30000, len(hh)), 'fio_load') if len(hh) > 0 else hh
-    heat = hh[['lat','long','fio_load']].copy()
-    if len(heat) > 80000:
-        heat = heat.nlargest(80000, 'fio_load')
+    # Use all data instead of sampling for better analysis
+    markers = hh  # Use all household data
+    heat = hh[['lat','long','fio_load']].copy()  # Use all data for heatmap too
     markers.to_csv(config.DASH_TOILETS_MARKERS_PATH, index=False)
     heat.to_csv(config.DASH_TOILETS_HEATMAP_PATH, index=False)
 

@@ -10,11 +10,11 @@
       "private": 35,
       "government": 100
     },
-    "od_reduction_percent": 0.0,
-    "infrastructure_upgrade_percent": 0.0,
+    "od_reduction_percent": 100.0,
+    "infrastructure_upgrade_percent": 100.0,
     "centralized_treatment_enabled": false,
-    "fecal_sludge_treatment_percent": 0.0,
+    "fecal_sludge_treatment_percent": 100.0,
     "scenario_name": "custom__crisis_2025_current"
   },
-  "timestamp": "2025-10-06T08:27:30.759016Z"
+  "timestamp": "2025-10-06T10:34:23.598442Z"
 }

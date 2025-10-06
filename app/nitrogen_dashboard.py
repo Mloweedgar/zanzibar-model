@@ -10,14 +10,24 @@ import pandas as pd
 import numpy as np
 import pydeck as pdk
 
+# Nitrogen dashboard configuration - CHANGE SCALE VALUES HERE ONLY
+NITROGEN_SCALE_MIN = 20.0  # Fixed minimum scale value (kg N/year)
+NITROGEN_SCALE_MAX = 45.0  # Fixed maximum scale value (kg N/year)
+
 
 # Support both package and script execution
 try:
     from app import fio_config as config  # when executed as a script by Streamlit
     from app import n_runner
 except Exception:
-    from . import fio_config as config  # when imported as a package
-    from . import n_runner
+    import sys
+    from pathlib import Path
+    # Add parent directory to path when running as script
+    parent_dir = Path(__file__).parent.parent
+    if str(parent_dir) not in sys.path:
+        sys.path.insert(0, str(parent_dir))
+    from app import fio_config as config
+    from app import n_runner
 
 
 def _format_large(x) -> str:
@@ -104,23 +114,21 @@ def _webgl_deck_nitrogen(nitrogen_data: pd.DataFrame, *, show_nitrogen_loads: bo
             except Exception:
                 d = d.sample(n=MAX_POINTS, random_state=42)
         
-        # Create nitrogen load categories
-        def nitrogen_category(load: float) -> str:
+        # Use the scale constants defined at the top of the function
+        
+        def nitrogen_color_intensity(load: float) -> float:
+            """Convert nitrogen load to color intensity (0-1) for fixed scale"""
             try:
                 x = float(load)
+                if pd.isna(x) or x < 0:
+                    return 0.0
+                # Normalize to 0-1 scale
+                intensity = (x - NITROGEN_SCALE_MIN) / (NITROGEN_SCALE_MAX - NITROGEN_SCALE_MIN)
+                return max(0.0, min(1.0, intensity))  # Clamp to [0,1]
             except Exception:
-                return 'unknown'
-            if pd.isna(x) or x < 0:
-                return 'unknown'
-            if x < 20:
-                return 'low'
-            if x < 40:
-                return 'moderate'
-            if x < 60:
-                return 'high'
-            return 'very high'
-
-        d['nitrogen_category'] = d['nitrogen_load'].apply(nitrogen_category)
+                return 0.0
+        
+        d['nitrogen_intensity'] = d['nitrogen_load'].apply(nitrogen_color_intensity)
         
         # Create toilet type labels
         def toilet_type_label(cat_id: int) -> str:
@@ -152,31 +160,56 @@ def _webgl_deck_nitrogen(nitrogen_data: pd.DataFrame, *, show_nitrogen_loads: bo
 
     nitrogen_df = prepare_nitrogen_data(nitrogen_data)
 
-    # Color schemes
-    def color_from_nitrogen_cat(c: str):
-        c = (c or '').lower()
-        if c == 'low': return [46, 204, 113, 200]      # green
-        if c == 'moderate': return [52, 152, 219, 200] # blue
-        if c == 'high': return [243, 156, 18, 200]     # orange
-        if c == 'very high': return [231, 76, 60, 200] # red
-        return [160, 160, 160, 200]                   # gray
+    # Fixed scale color scheme - continuous gradient from green to red
+    def color_from_nitrogen_intensity(intensity: float) -> list:
+        """Convert intensity (0-1) to color gradient from green to red"""
+        try:
+            intensity = float(intensity)
+            intensity = max(0.0, min(1.0, intensity))  # Clamp to [0,1]
+        except Exception:
+            intensity = 0.0
+        
+        # Color gradient: green (low) -> yellow -> orange -> red (high)
+        if intensity < 0.33:
+            # Green to yellow
+            ratio = intensity / 0.33
+            r = int(46 + (255 - 46) * ratio)
+            g = 255
+            b = int(113 - 113 * ratio)
+        elif intensity < 0.66:
+            # Yellow to orange
+            ratio = (intensity - 0.33) / 0.33
+            r = 255
+            g = int(255 - 99 * ratio)
+            b = 0
+        else:
+            # Orange to red
+            ratio = (intensity - 0.66) / 0.34
+            r = 255
+            g = int(156 - 80 * ratio)
+            b = int(18 - 18 * ratio)
+        
+        return [r, g, b, 200]  # Alpha = 200 for transparency
 
     # removed toilet type color mapping from nitrogen view
 
-    # Size based on nitrogen load (scaled)
+    # Fixed scale size based on nitrogen load
     def size_from_load(load: float) -> float:
         try:
             x = float(load)
             if pd.isna(x) or x < 0:
                 return 3.0
-            # Scale: 3-15 pixels based on load
-            return min(15.0, max(3.0, 3.0 + (x / 10.0)))
+            # Fixed scale: 3-12 pixels based on fixed range
+            # Normalize to 0-1 then scale to 3-12
+            intensity = (x - NITROGEN_SCALE_MIN) / (NITROGEN_SCALE_MAX - NITROGEN_SCALE_MIN)
+            intensity = max(0.0, min(1.0, intensity))
+            return 3.0 + (intensity * 9.0)  # 3-12 pixel range
         except Exception:
             return 3.0
 
     if not nitrogen_df.empty:
         nitrogen_df['size_px'] = nitrogen_df['nitrogen_load'].apply(size_from_load)
-        nitrogen_df['nitrogen_color'] = nitrogen_df['nitrogen_category'].apply(color_from_nitrogen_cat)
+        nitrogen_df['nitrogen_color'] = nitrogen_df['nitrogen_intensity'].apply(color_from_nitrogen_intensity)
 
     layers = []
     view_state = pdk.ViewState(latitude=center[0], longitude=center[1], zoom=10, pitch=0)
@@ -306,29 +339,41 @@ def _tunable_controls(base: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _legend_and_toggles(defaults: Dict[str, bool]) -> Dict[str, bool]:
-    # Legend for nitrogen loads
+    # Continuous scale legend for nitrogen loads using colored blocks
     html = """
     <style>
-    .legend-top { display: flex; align-items: center; gap: 16px; margin: 8px 0 6px 0; padding: 10px 12px; background: #ffffff;
-                  border: 1px solid #e0e0e0; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); font-size: 13px; }
-    .legend-top .title { font-weight: 600; margin-right: 6px; color: #333; }
-    .legend-top .entry { display: inline-flex; align-items: center; gap: 6px; color: #333; }
-    .legend-top .dot { width: 10px; height: 10px; border-radius: 50%%; display: inline-block; }
-    .legend-top .sep { width: 1px; height: 14px; background: #e0e0e0; margin: 0 2px; }
-    @media (max-width: 768px) { .legend-top { flex-wrap: wrap; gap: 10px; } }
+    .legend-top {{ display: flex; align-items: center; gap: 16px; margin: 8px 0 6px 0; padding: 10px 12px; background: #ffffff;
+                  border: 1px solid #e0e0e0; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); font-size: 13px; }}
+    .legend-top .title {{ font-weight: 600; margin-right: 8px; color: #333; }}
+    .legend-top .scale-container {{ display: flex; align-items: center; gap: 8px; }}
+    .legend-top .scale-blocks {{ display: flex; width: 120px; height: 16px; border-radius: 4px; overflow: hidden; border: 1px solid #333; }}
+    .legend-top .block {{ flex: 1; height: 100%; }}
+    .legend-top .scale-labels {{ display: flex; justify-content: space-between; width: 120px; font-size: 11px; color: #666; margin-top: 2px; }}
+    .legend-top .sep {{ width: 1px; height: 14px; background: #e0e0e0; margin: 0 8px; }}
+    @media (max-width: 768px) {{ .legend-top {{ flex-wrap: wrap; gap: 10px; }} }}
     </style>
     <div class="legend-top">
       <div class="title">Nitrogen Load (kg N/year):</div>
-      <div class="entry"><span class="dot" style="background:#2ecc71"></span>Low (&lt;20) </div>
+      <div class="scale-container">
+        <div style="display: flex; flex-direction: column; align-items: center;">
+          <div class="scale-blocks">
+            <div class="block" style="background-color: #2ecc71;"></div>
+            <div class="block" style="background-color: #52ff52;"></div>
+            <div class="block" style="background-color: #ffff00;"></div>
+            <div class="block" style="background-color: #ff8000;"></div>
+            <div class="block" style="background-color: #ff0000;"></div>
+          </div>
+          <div class="scale-labels">
+            <span>{scale_min}</span>
+            <span>{scale_max}</span>
+          </div>
+        </div>
+      </div>
       <div class="sep"></div>
-      <div class="entry"><span class="dot" style="background:#3498db"></span>Moderate (20-40) </div>
-      <div class="sep"></div>
-      <div class="entry"><span class="dot" style="background:#f39c12"></span>High (40-60) </div>
-      <div class="sep"></div>
-      <div class="entry"><span class="dot" style="background:#e74c3c"></span>Very High (&gt;60) </div>
+      <div style="font-size: 11px; color: #666;">Fixed scale for comparison</div>
     </div>
     """
-    st.markdown(html, unsafe_allow_html=True)
+    st.markdown(html.format(scale_min=int(NITROGEN_SCALE_MIN), scale_max=int(NITROGEN_SCALE_MAX)), unsafe_allow_html=True)
     
     # Toggles
     col1, col3 = st.columns([3, 2])
@@ -373,6 +418,21 @@ def main():
         st.success('Nitrogen scenario outputs updated.')
 
     outs = _load_nitrogen_outputs()
+    
+    # Display summary statistics
+    if not outs['nitrogen_loads'].empty:
+        nitrogen_data = outs['nitrogen_loads']
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.metric("Total Households", f"{len(nitrogen_data):,}")
+        with col2:
+            mean_load = nitrogen_data['nitrogen_load'].mean()
+            st.metric("Average Load", f"{mean_load:.1f} kg N/year")
+        with col3:
+            max_load = nitrogen_data['nitrogen_load'].max()
+            st.metric("Peak Load", f"{max_load:.1f} kg N/year")
+    
     toggled = _legend_and_toggles({
         'show_nitrogen_loads': bool(tuned.get('show_nitrogen_loads', True)),
         'show_ward_boundaries': bool(tuned.get('show_ward_boundaries', False)),

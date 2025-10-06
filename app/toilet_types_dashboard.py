@@ -79,6 +79,28 @@ def main():
         st.info('No nitrogen points available. Run nitrogen pipeline first.')
         return
 
+    # Display summary statistics - distribution counts
+    col1, col2, col3, col4, col5 = st.columns(5)
+    
+    with col1:
+        st.metric("Total Households", f"{len(df):,}")
+    
+    with col2:
+        sewered_count = len(df[df['toilet_category_id'] == 1])
+        st.metric("Sewered", f"{sewered_count:,}")
+    
+    with col3:
+        pit_count = len(df[df['toilet_category_id'] == 2])
+        st.metric("Pit Latrine", f"{pit_count:,}")
+    
+    with col4:
+        septic_count = len(df[df['toilet_category_id'] == 3])
+        st.metric("Septic", f"{septic_count:,}")
+    
+    with col5:
+        od_count = len(df[df['toilet_category_id'] == 4])
+        st.metric("Open Defecation", f"{od_count:,}")
+
     # derive colors
     df['toilet_color'] = df['toilet_category_id'].apply(_color_from_toilet_type)
 
@@ -94,26 +116,63 @@ def main():
 
     _legend()
 
-    # Toggle controls (placed below legend for consistency)
+    # Individual layer toggle controls
+    st.markdown("**Toggle Layers:** *Use checkboxes below to show/hide specific toilet types*")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        show_sewered = st.checkbox('Sewered', value=True, key='sewered_toggle')
+    with col2:
+        show_pit_latrine = st.checkbox('Pit Latrine', value=True, key='pit_toggle')
+    with col3:
+        show_septic = st.checkbox('Septic', value=True, key='septic_toggle')
+    with col4:
+        show_open_defecation = st.checkbox('Open Defecation', value=True, key='od_toggle')
+    
+    # Ward boundaries toggle
     show_ward_boundaries = st.checkbox('Ward boundaries', value=False)
+
+    # Filter data based on checkbox selections
+    filtered_data = df.copy()
+    
+    # Create a list to track which categories to show
+    categories_to_show = []
+    if show_sewered:
+        categories_to_show.append(1)
+    if show_pit_latrine:
+        categories_to_show.append(2)
+    if show_septic:
+        categories_to_show.append(3)
+    if show_open_defecation:
+        categories_to_show.append(4)
+    
+    # Filter the dataframe
+    if categories_to_show:
+        filtered_data = filtered_data[filtered_data['toilet_category_id'].isin(categories_to_show)]
+    else:
+        # If no categories are selected, show empty dataframe
+        filtered_data = filtered_data[filtered_data['toilet_category_id'] == -1]
 
     view_state = pdk.ViewState(latitude=-6.165, longitude=39.202, zoom=10, pitch=0)
     layers = []
-    layer = pdk.Layer(
-        'ScatterplotLayer',
-        data=df,
-        get_position='[long, lat]',
-        get_fill_color='toilet_color',
-        radius_min_pixels=4,
-        radius_max_pixels=4,
-        pickable=False,
-        stroked=True,
-        get_line_color='[0,0,0,100]',
-        line_width_min_pixels=1,
-        opacity=0.85,
-        id='layer-toilet-types-only'
-    )
-    layers.append(layer)
+    
+    # Only create the layer if there's data to show
+    if not filtered_data.empty:
+        layer = pdk.Layer(
+            'ScatterplotLayer',
+            data=filtered_data,
+            get_position='[long, lat]',
+            get_fill_color='toilet_color',
+            radius_min_pixels=4,
+            radius_max_pixels=4,
+            pickable=False,
+            stroked=True,
+            get_line_color='[0,0,0,100]',
+            line_width_min_pixels=1,
+            opacity=0.85,
+            id='layer-toilet-types-only'
+        )
+        layers.append(layer)
 
     # Ward boundaries layer (optional)
     if show_ward_boundaries:

@@ -1,5 +1,5 @@
 {
-  "scenario_name": "crisis_2025_current",
+  "scenario_name": "custom__crisis_2025_current",
   "parameters": {
     "label": "Current situation (status quo)",
     "description": "No interventions applied.",
@@ -13,8 +13,9 @@
     "od_reduction_percent": 0.0,
     "infrastructure_upgrade_percent": 0.0,
     "centralized_treatment_enabled": false,
-    "fecal_sludge_treatment_percent": 0.0
+    "fecal_sludge_treatment_percent": 0.0,
+    "scenario_name": "custom__crisis_2025_current"
   },
-  "timestamp": "2025-10-06T07:05:28.669978Z",
+  "timestamp": "2025-10-06T10:18:39.878761Z",
   "model_type": "nitrogen"
 }
