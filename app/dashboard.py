@@ -11,13 +11,19 @@ import numpy as np
 import pydeck as pdk
  
 
-# Support both package and script execution
+# Support both package and script execution (robust for Streamlit Cloud)
 try:
-    from app import fio_config as config  # when executed as a script by Streamlit
+    from app import fio_config as config  # normal absolute import when package is resolvable
     from app import fio_runner
 except Exception:
-    from . import fio_config as config  # when imported as a package
-    from . import fio_runner
+    import sys
+    from pathlib import Path as _Path
+    # Add project root to sys.path when running as a loose script (no package parent)
+    _parent_dir = _Path(__file__).parent.parent
+    if str(_parent_dir) not in sys.path:
+        sys.path.insert(0, str(_parent_dir))
+    from app import fio_config as config
+    from app import fio_runner
 
 
 def _get_model_thresholds() -> tuple[float, float, float]:
