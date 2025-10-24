@@ -1,0 +1,182 @@
+[
+  {
+    "scenario": "baseline",
+    "parameters": {
+      "label": "Current situation (status quo)",
+      "description": "No interventions applied.",
+      "pop_factor": 1.0,
+      "EFIO_override": 8960000000.0,
+      "ks_per_m": 0.003,
+      "radius_by_type": {
+        "private": 35,
+        "government": 100
+      },
+      "od_reduction_percent": 0.0,
+      "infrastructure_upgrade_percent": 0.0,
+      "centralized_treatment_enabled": false,
+      "fecal_sludge_treatment_percent": 0.0,
+      "scenario_name": "crisis_2025_current"
+    },
+    "private": {
+      "n": 15285,
+      "median": 11381767.34980204,
+      "mean": 29655136.183293186,
+      "p90": 64964112.54389312,
+      "very_high_pct": 100.0,
+      "high_or_worse_pct": 100.0
+    },
+    "government": {
+      "n": 44,
+      "median": 2836944.8085018746,
+      "mean": 4186074.5635280367,
+      "p90": 10322329.36444426,
+      "very_high_pct": 100.0,
+      "high_or_worse_pct": 100.0
+    },
+    "total_fio_load_CFU_per_day": 1.662872064e+16
+  },
+  {
+    "scenario": "stone_town_wsp",
+    "parameters": {
+      "label": "Stone Town WSP (Kisakasaka) \u2013 outfall mitigation",
+      "description": "Pilot centralized treatment to reduce sea outfalls.",
+      "pop_factor": 1.0,
+      "EFIO_override": 8960000000.0,
+      "ks_per_m": 0.003,
+      "radius_by_type": {
+        "private": 35,
+        "government": 100
+      },
+      "od_reduction_percent": 10.0,
+      "infrastructure_upgrade_percent": 30.0,
+      "centralized_treatment_enabled": true,
+      "fecal_sludge_treatment_percent": 30.0,
+      "scenario_name": "stone_town_wsp_kisakasaka"
+    },
+    "private": {
+      "n": 15285,
+      "median": 24422618.13500328,
+      "mean": 68518890.82896166,
+      "p90": 150850185.82847187,
+      "very_high_pct": 100.0,
+      "high_or_worse_pct": 100.0
+    },
+    "government": {
+      "n": 44,
+      "median": 5823172.30791292,
+      "mean": 9692102.177896582,
+      "p90": 26322641.568946656,
+      "very_high_pct": 100.0,
+      "high_or_worse_pct": 100.0
+    },
+    "total_fio_load_CFU_per_day": 1.4815097024e+16
+  },
+  {
+    "scenario": "fsm_scale_up",
+    "parameters": {
+      "label": "Faecal Sludge Management (FSM) scale-up",
+      "description": "Increase sludge collection and treatment capacity.",
+      "pop_factor": 1.0,
+      "EFIO_override": 8960000000.0,
+      "ks_per_m": 0.003,
+      "radius_by_type": {
+        "private": 35,
+        "government": 100
+      },
+      "od_reduction_percent": 10.0,
+      "infrastructure_upgrade_percent": 20.0,
+      "centralized_treatment_enabled": false,
+      "fecal_sludge_treatment_percent": 60.0,
+      "scenario_name": "fsm_scale_up"
+    },
+    "private": {
+      "n": 15285,
+      "median": 21988021.60249049,
+      "mean": 64095398.744950905,
+      "p90": 141631460.90970495,
+      "very_high_pct": 100.0,
+      "high_or_worse_pct": 100.0
+    },
+    "government": {
+      "n": 44,
+      "median": 5565230.219941106,
+      "mean": 9131569.885555457,
+      "p90": 25398295.52035723,
+      "very_high_pct": 100.0,
+      "high_or_worse_pct": 100.0
+    },
+    "total_fio_load_CFU_per_day": 1.3801920384e+16
+  },
+  {
+    "scenario": "od_reduction",
+    "parameters": {
+      "label": "Open Defecation reduction",
+      "description": "Reduce open defecation through behavior change and basic facility provision.",
+      "pop_factor": 1.0,
+      "EFIO_override": 8960000000.0,
+      "ks_per_m": 0.003,
+      "radius_by_type": {
+        "private": 35,
+        "government": 100
+      },
+      "od_reduction_percent": 30.0,
+      "infrastructure_upgrade_percent": 0.0,
+      "centralized_treatment_enabled": false,
+      "fecal_sludge_treatment_percent": 0.0,
+      "scenario_name": "open_defecation_reduction"
+    },
+    "private": {
+      "n": 15285,
+      "median": 12861384.694416858,
+      "mean": 36308155.421833344,
+      "p90": 78380990.29237299,
+      "very_high_pct": 100.0,
+      "high_or_worse_pct": 100.0
+    },
+    "government": {
+      "n": 44,
+      "median": 3089212.0344993463,
+      "mean": 4763865.3673528815,
+      "p90": 11272993.175662179,
+      "very_high_pct": 100.0,
+      "high_or_worse_pct": 100.0
+    },
+    "total_fio_load_CFU_per_day": 1.631236992e+16
+  },
+  {
+    "scenario": "infrastructure_upgrade",
+    "parameters": {
+      "scenario_name": "infrastructure_upgrade",
+      "label": "Infrastructure upgrade emphasis",
+      "description": "Upgrade half of pit latrines to septic standard",
+      "pop_factor": 1.0,
+      "EFIO_override": 8960000000.0,
+      "ks_per_m": 0.003,
+      "radius_by_type": {
+        "private": 35,
+        "government": 100
+      },
+      "od_reduction_percent": 0.0,
+      "infrastructure_upgrade_percent": 50.0,
+      "centralized_treatment_enabled": false,
+      "fecal_sludge_treatment_percent": 0.0
+    },
+    "private": {
+      "n": 15285,
+      "median": 14106942.399258137,
+      "mean": 37305330.26462507,
+      "p90": 83551197.21854179,
+      "very_high_pct": 100.0,
+      "high_or_worse_pct": 100.0
+    },
+    "government": {
+      "n": 44,
+      "median": 3568688.839077363,
+      "mean": 5722698.73806933,
+      "p90": 15005860.280874474,
+      "very_high_pct": 100.0,
+      "high_or_worse_pct": 100.0
+    },
+    "total_fio_load_CFU_per_day": 1.598962176e+16
+  }
+]
