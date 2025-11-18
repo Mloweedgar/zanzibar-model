@@ -50,20 +50,14 @@ def _format_large(x) -> str:
 
 
 @st.cache_data(show_spinner=False)
-def _read_csv_cached(path: str, mtime: float | None) -> pd.DataFrame:
-    if not mtime:
-        return pd.DataFrame()
-    return pd.read_csv(path)
-
-
-def _load_nitrogen_outputs() -> Dict[str, pd.DataFrame]:
+def _load_nitrogen_outputs(_sig: Dict[str, float]) -> Dict[str, pd.DataFrame]:
+    """Load nitrogen outputs once and reuse across reruns."""
     outputs = {}
     paths = {
         'nitrogen_loads': config.NET_NITROGEN_LOAD_PATH,
     }
     for k, p in paths.items():
-        mtime = p.stat().st_mtime if p.exists() else None
-        outputs[k] = _read_csv_cached(str(p), mtime)
+        outputs[k] = pd.read_csv(p) if p.exists() else pd.DataFrame()
     return outputs
 
 
@@ -401,6 +395,10 @@ def main():
     sel = _scenario_selector()
     tuned = _tunable_controls(sel['params'])
 
+    # Capture modification time to invalidate cached loads when the scenario reruns
+    nitro_path = config.NET_NITROGEN_LOAD_PATH
+    output_sig = {'nitrogen_loads': nitro_path.stat().st_mtime} if nitro_path.exists() else {}
+
     # Single-submit scenario form
     with st.sidebar.form('scenario_form'):
         st.markdown('#### Edit scenario settings')
@@ -425,7 +423,7 @@ def main():
                 n_runner.run_scenario(scenario_payload)
         st.success('Nitrogen scenario outputs updated.')
 
-    outs = _load_nitrogen_outputs()
+    outs = _load_nitrogen_outputs(output_sig)
     
     # Display summary statistics
     if not outs['nitrogen_loads'].empty:
