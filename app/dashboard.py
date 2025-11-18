@@ -68,19 +68,68 @@ def _format_large(x) -> str:
         return "-"
 
 
-def _load_outputs() -> Dict[str, pd.DataFrame]:
+@st.cache_data(show_spinner=False)
+def _read_csv_cached(path_str: str) -> pd.DataFrame:
+    return pd.read_csv(path_str)
+
+
+def _load_outputs(max_rows: Optional[int], highlight_value: Optional[str]) -> tuple[Dict[str, pd.DataFrame], list[str]]:
     outputs = {}
-    paths: Dict[str, tuple[Path, Optional[Path]]] = {
-        'priv_bh_dash': (config.DASH_PRIVATE_BH_SMALL_PATH, config.DASH_PRIVATE_BH_PATH),
-        'gov_bh_dash': (config.DASH_GOVERNMENT_BH_SMALL_PATH, config.DASH_GOVERNMENT_BH_PATH),
-    }
-    for key, (preferred, fallback) in paths.items():
-        path = preferred if preferred and preferred.exists() else fallback
-        outputs[key] = pd.read_csv(path) if path and path.exists() else pd.DataFrame()
-    return outputs
+    notes: list[str] = []
+    specs = [
+        ('priv_bh_dash', 'Private wells', config.DASH_PRIVATE_BH_PATH, config.DASH_PRIVATE_BH_SMALL_PATH),
+        ('gov_bh_dash', 'ZAWA boreholes', config.DASH_GOVERNMENT_BH_PATH, config.DASH_GOVERNMENT_BH_SMALL_PATH),
+    ]
+    for key, label, primary, fallback in specs:
+        path = primary if primary and primary.exists() else fallback
+        if path and path.exists():
+            df = _read_csv_cached(str(path))
+        else:
+            df = pd.DataFrame()
+        sampled, msg = _downsample_for_display(
+            df,
+            max_rows,
+            key='borehole_id',
+            highlight_value=highlight_value,
+            label=label
+        )
+        outputs[key] = sampled
+        if msg:
+            notes.append(msg)
+    return outputs, notes
 
 
 BOREHOLE_VIEW_COLUMNS = ['borehole_id', 'lat', 'long', 'concentration_CFU_per_100mL']
+
+
+def _downsample_for_display(
+    df: pd.DataFrame,
+    max_rows: Optional[int],
+    *,
+    key: Optional[str] = None,
+    highlight_value: Optional[str] = None,
+    label: str = ""
+) -> tuple[pd.DataFrame, Optional[str]]:
+    """Sample dataframe to `max_rows` rows and keep highlighted feature if provided."""
+    if df is None or df.empty or not max_rows or max_rows <= 0:
+        return df, None
+    n = len(df)
+    if n <= max_rows:
+        return df, None
+    sampled = df.sample(n=max_rows, random_state=42)
+    if highlight_value and key and key in df.columns:
+        try:
+            highlight_key = str(highlight_value).strip().casefold()
+            sampled_keys = sampled[key].astype(str).str.strip().str.casefold()
+            if highlight_key not in set(sampled_keys):
+                match = df[df[key].astype(str).str.strip().str.casefold() == highlight_key]
+                if not match.empty:
+                    sampled = pd.concat([sampled, match.iloc[:1]], ignore_index=True)
+                    sampled = sampled.drop_duplicates(subset=[key], keep='first')
+        except Exception:
+            pass
+    msg = f"{label}: showing {len(sampled):,} of {n:,} rows (sample applied)"
+    return sampled, msg
 
 
 def _apply_template_to_state(params: Dict[str, Any]) -> None:
@@ -318,6 +367,25 @@ def _tunable_controls(base: Dict[str, Any]) -> Dict[str, Any]:
     return scenario
 
 
+def _data_detail_controls() -> Dict[str, Optional[int]]:
+    """Sidebar controls to govern how many boreholes are sent to the browser."""
+    st.sidebar.markdown('---')
+    st.sidebar.subheader('Visualization detail')
+    st.sidebar.caption('Lower limits keep Streamlit Cloud stable; raise gradually to test limits.')
+    options = [
+        ('Testing (~100 / layer)', 100),
+        ('Low (~1k / layer)', 1_000),
+        ('Balanced (~5k / layer)', 5_000),
+        ('High (~10k / layer)', 10_000),
+        ('Full dataset', None),
+    ]
+    labels = [label for label, _ in options]
+    default_idx = 0
+    selected = st.sidebar.selectbox('Max boreholes per layer', labels, index=default_idx)
+    value = dict(options)[selected]
+    return {'max_points': value, 'selection_label': selected}
+
+
 def _legend_and_toggles(defaults: Dict[str, bool]) -> Dict[str, bool]:
         # Load calibrated thresholds for legend labels (model-side, CFU/100mL)
         t1, t2, t3 = _get_model_thresholds()
@@ -393,6 +461,8 @@ def main():
 
     sel = _scenario_selector()
     tuned = _tunable_controls(sel['params'])
+    detail_cfg = _data_detail_controls()
+    max_points = detail_cfg.get('max_points')
 
     # Single-submit scenario form: edits are buffered until submitted
     with st.sidebar.form('scenario_form'):
@@ -418,13 +488,15 @@ def main():
                 fio_runner.run_scenario(scenario_payload)
         st.success('Scenario outputs updated.')
 
-    outs = _load_outputs()
+    outs, sample_notes = _load_outputs(max_points, tuned.get('highlight_borehole_id'))
     # Heatmap radius removed
     toggled = _legend_and_toggles({
         'show_private': bool(tuned.get('show_private', True)),
         'show_government': bool(tuned.get('show_government', True)),
         'show_ward_boundaries': bool(tuned.get('show_ward_boundaries', False)),
     })
+    if sample_notes:
+        st.info(" ".join(sample_notes) + " Adjust the 'Max boreholes per layer' control to change detail.")
     deck = _webgl_deck(
         outs['priv_bh_dash'],
         outs['gov_bh_dash'],
