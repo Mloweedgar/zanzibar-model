@@ -10,8 +10,10 @@ import pydeck as pdk
 
 try:
     from app import fio_config as config
+    from app.streamlit_media import dataframe_to_media_url
 except Exception:
     from . import fio_config as config
+    from .streamlit_media import dataframe_to_media_url
 
 
 def _load_nitrogen_points() -> pd.DataFrame:
@@ -158,9 +160,10 @@ def main():
     
     # Only create the layer if there's data to show
     if not filtered_data.empty:
+        layer_data = dataframe_to_media_url(filtered_data, label="toilet-types") or filtered_data
         layer = pdk.Layer(
             'ScatterplotLayer',
-            data=filtered_data,
+            data=layer_data,
             get_position='[long, lat]',
             get_fill_color='toilet_color',
             radius_min_pixels=4,
@@ -202,5 +205,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-
 

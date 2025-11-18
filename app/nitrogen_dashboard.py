@@ -19,6 +19,7 @@ NITROGEN_SCALE_MAX = 45.0  # Fixed maximum scale value (kg N/year)
 try:
     from app import fio_config as config  # when executed as a script by Streamlit
     from app import n_runner
+    from app.streamlit_media import dataframe_to_media_url
 except Exception:
     import sys
     from pathlib import Path
@@ -28,6 +29,7 @@ except Exception:
         sys.path.insert(0, str(parent_dir))
     from app import fio_config as config
     from app import n_runner
+    from app.streamlit_media import dataframe_to_media_url
 
 
 def _format_large(x) -> str:
@@ -212,6 +214,11 @@ def _webgl_deck_nitrogen(nitrogen_data: pd.DataFrame, *, show_nitrogen_loads: bo
         nitrogen_df['size_px'] = nitrogen_df['nitrogen_load'].apply(size_from_load)
         nitrogen_df['nitrogen_color'] = nitrogen_df['nitrogen_intensity'].apply(color_from_nitrogen_intensity)
 
+    # Stream the dataset via the media endpoint when possible so we avoid
+    # pushing ~60MB payloads through the websocket while still keeping every
+    # point. Falls back to the dataframe locally.
+    nitrogen_layer_data = dataframe_to_media_url(nitrogen_df, label="nitrogen-loads") or nitrogen_df
+
     layers = []
     view_state = pdk.ViewState(latitude=center[0], longitude=center[1], zoom=10, pitch=0)
 
@@ -219,7 +226,7 @@ def _webgl_deck_nitrogen(nitrogen_data: pd.DataFrame, *, show_nitrogen_loads: bo
     if not nitrogen_df.empty and show_nitrogen_loads:
         layers.append(pdk.Layer(
             'ScatterplotLayer',
-            data=nitrogen_df,
+            data=nitrogen_layer_data,
             get_position='[long, lat]',
             get_fill_color='nitrogen_color',
             get_radius='size_px',
