@@ -26,11 +26,14 @@ except Exception:
     from app import fio_runner
 
 
-def _get_model_thresholds() -> tuple[float, float, float]:
+@st.cache_data(show_spinner=False)
+def _load_thresholds_from_file(ts_marker: float) -> tuple[float, float, float]:
     """Strictly load model-side thresholds (CFU/100mL) from calibration_mapping.json.
 
     Raises if the file or required fields are missing/invalid.
     """
+    # ts_marker is used to invalidate the cache when the source file changes
+    _ = ts_marker
     p = config.OUTPUT_DATA_DIR / 'calibration_mapping.json'
     if not p.exists():
         raise FileNotFoundError(f"Expected thresholds at {p}; run calibration to create this file.")
@@ -48,6 +51,14 @@ def _get_model_thresholds() -> tuple[float, float, float]:
     if not (t1 > 0 and t2 > t1 and t3 > t2):
         raise ValueError("Thresholds must be strictly increasing and positive")
     return (t1, t2, t3)
+
+
+def _get_model_thresholds() -> tuple[float, float, float]:
+    """Wrapper that invalidates cached thresholds when the file timestamp changes."""
+
+    p = config.OUTPUT_DATA_DIR / 'calibration_mapping.json'
+    ts_marker = p.stat().st_mtime if p.exists() else 0.0
+    return _load_thresholds_from_file(ts_marker)
 
 def _format_large(x) -> str:
     # Robust formatter: accepts numbers or numeric strings; returns '-' if not parseable
@@ -68,7 +79,8 @@ def _format_large(x) -> str:
         return "-"
 
 
-def _load_outputs() -> Dict[str, pd.DataFrame]:
+@st.cache_data(show_spinner=False)
+def _load_outputs_cached(ts_markers: Dict[str, float]) -> Dict[str, pd.DataFrame]:
     outputs = {}
     paths = {
         'hh_loads_markers': config.DASH_TOILETS_MARKERS_PATH,
@@ -80,6 +92,48 @@ def _load_outputs() -> Dict[str, pd.DataFrame]:
     for k, p in paths.items():
         outputs[k] = pd.read_csv(p) if p.exists() else pd.DataFrame()
     return outputs
+
+
+def _load_outputs() -> Dict[str, pd.DataFrame]:
+    """Load dashboard CSVs with caching keyed to file modification times."""
+
+    ts_markers = {}
+    for key, path in {
+        'hh_loads_markers': config.DASH_TOILETS_MARKERS_PATH,
+        'hh_loads_heat': config.DASH_TOILETS_HEATMAP_PATH,
+        'priv_bh_dash': config.DASH_PRIVATE_BH_PATH,
+        'gov_bh_dash': config.DASH_GOVERNMENT_BH_PATH,
+        'bh_conc': config.FIO_CONCENTRATION_AT_BOREHOLES_PATH,
+    }.items():
+        ts_markers[key] = path.stat().st_mtime if path.exists() else 0.0
+    return _load_outputs_cached(ts_markers)
+
+
+@st.cache_data(show_spinner=False)
+def _load_wards_geojson(path: Path, ts_marker: float) -> Optional[dict]:
+    """Load and flatten ward GeoJSON with caching for quicker reruns."""
+
+    with open(path, 'r', encoding='utf-8') as fh:
+        wards_geo = json.load(fh)
+    # Flatten fields for tooltip token replacement (avoid nested properties path)
+    try:
+        feats = wards_geo.get('features', [])
+        for f in feats:
+            props = f.get('properties') or {}
+            f['ward_label'] = props.get('ward_name') or ''
+            f['div_name'] = props.get('div_name') or ''
+            f['counc_name'] = props.get('counc_name') or ''
+            f['dist_name'] = props.get('dist_name') or ''
+            f['reg_name'] = props.get('reg_name') or ''
+            f['tooltip_html'] = (
+                f"<div><b>{f['ward_label']}</b><br><small>"
+                f"Division: {f['div_name']} &nbsp;•&nbsp; Council: {f['counc_name']}<br>"
+                f"District: {f['dist_name']} &nbsp;•&nbsp; Region: {f['reg_name']}"
+                f"</small></div>"
+            )
+    except Exception:
+        pass
+    return wards_geo
 
 
 def _apply_template_to_state(params: Dict[str, Any]) -> None:
@@ -291,38 +345,20 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
     try:
         p = config.INPUT_DATA_DIR / 'wards.geojson'
         if p.exists():
-            with open(p, 'r', encoding='utf-8') as fh:
-                wards_geo = json.load(fh)
-            # Flatten fields for tooltip token replacement (avoid nested properties path)
-            try:
-                feats = wards_geo.get('features', [])
-                for f in feats:
-                    props = f.get('properties') or {}
-                    f['ward_label'] = props.get('ward_name') or ''
-                    f['div_name'] = props.get('div_name') or ''
-                    f['counc_name'] = props.get('counc_name') or ''
-                    f['dist_name'] = props.get('dist_name') or ''
-                    f['reg_name'] = props.get('reg_name') or ''
-                    f['tooltip_html'] = (
-                        f"<div><b>{f['ward_label']}</b><br><small>"
-                        f"Division: {f['div_name']} &nbsp;•&nbsp; Council: {f['counc_name']}<br>"
-                        f"District: {f['dist_name']} &nbsp;•&nbsp; Region: {f['reg_name']}"
-                        f"</small></div>"
-                    )
-            except Exception:
-                pass
-            layers.append(pdk.Layer(
-                'GeoJsonLayer',
-                data=wards_geo,
-                stroked=True,
-                filled=True,
-                get_fill_color='[0,0,0,0]',
-                get_line_color='[40,40,40,160]',
-                line_width_min_pixels=1,
-                pickable=True,
-                visible=bool(show_ward_boundaries),
-                id='layer-ward-outline'
-            ))
+            wards_geo = _load_wards_geojson(p, p.stat().st_mtime)
+            if wards_geo:
+                layers.append(pdk.Layer(
+                    'GeoJsonLayer',
+                    data=wards_geo,
+                    stroked=True,
+                    filled=True,
+                    get_fill_color='[0,0,0,0]',
+                    get_line_color='[40,40,40,160]',
+                    line_width_min_pixels=1,
+                    pickable=True,
+                    visible=bool(show_ward_boundaries),
+                    id='layer-ward-outline'
+                ))
     except Exception:
         pass
 
