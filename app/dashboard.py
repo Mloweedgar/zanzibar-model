@@ -71,16 +71,16 @@ def _format_large(x) -> str:
 def _load_outputs() -> Dict[str, pd.DataFrame]:
     outputs = {}
     paths: Dict[str, tuple[Path, Optional[Path]]] = {
-        'hh_loads_markers': (config.DASH_TOILETS_MARKERS_PATH, None),
-        'hh_loads_heat': (config.DASH_TOILETS_HEATMAP_PATH, None),
         'priv_bh_dash': (config.DASH_PRIVATE_BH_SMALL_PATH, config.DASH_PRIVATE_BH_PATH),
         'gov_bh_dash': (config.DASH_GOVERNMENT_BH_SMALL_PATH, config.DASH_GOVERNMENT_BH_PATH),
-        'bh_conc': (config.FIO_CONCENTRATION_AT_BOREHOLES_PATH, None),
     }
     for key, (preferred, fallback) in paths.items():
         path = preferred if preferred and preferred.exists() else fallback
         outputs[key] = pd.read_csv(path) if path and path.exists() else pd.DataFrame()
     return outputs
+
+
+BOREHOLE_VIEW_COLUMNS = ['borehole_id', 'lat', 'long', 'concentration_CFU_per_100mL']
 
 
 def _apply_template_to_state(params: Dict[str, Any]) -> None:
@@ -104,21 +104,21 @@ def _apply_template_to_state(params: Dict[str, Any]) -> None:
     except Exception:
         ss['pop_factor'] = 1.0
 
-def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFrame, *, show_private: bool = True, show_government: bool = True, show_ward_load: bool = False, show_ward_boundaries: bool = False, highlight_borehole_id: Optional[str] = None, zoom_to_highlight: bool = True):
+def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, *, show_private: bool = True, show_government: bool = True, show_ward_boundaries: bool = False, highlight_borehole_id: Optional[str] = None, zoom_to_highlight: bool = True):
     """High-performance WebGL renderer using pydeck. Avoids clustering and handles large point sets smoothly."""
 
     center = [-6.165, 39.202]
     # Use calibrated model-side thresholds if available
     T1, T2, T3 = _get_model_thresholds()
 
-    def prepare_bh(df: pd.DataFrame, default_type: str) -> pd.DataFrame:
+    def prepare_bh(df: pd.DataFrame) -> pd.DataFrame:
         if df is None or df.empty:
-            return pd.DataFrame(columns=['borehole_id','borehole_type','lat','long','concentration_CFU_per_100mL'])
-        d = df.dropna(subset=['lat','long']).copy()
-        if 'borehole_type' not in d.columns:
-            d['borehole_type'] = default_type
+            return pd.DataFrame(columns=BOREHOLE_VIEW_COLUMNS)
+        keep_cols = [c for c in BOREHOLE_VIEW_COLUMNS if c in df.columns]
+        d = df[keep_cols].dropna(subset=['lat','long']).copy()
+        if 'borehole_id' not in d.columns:
+            d['borehole_id'] = d.index.astype(str)
         conc100 = pd.to_numeric(d.get('concentration_CFU_per_100mL', np.nan), errors='coerce')
-        d['logC'] = np.log10(conc100.replace(0, np.nan))
 
         def cat(v: float) -> str:
             try:
@@ -136,49 +136,11 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
             return 'very high'
 
         d['conc_category'] = conc100.apply(cat)
-        # Ensure fields exist for tooltips
-        for col in ['Q_L_per_day','lab_e_coli_CFU_per_100mL','lab_total_coliform_CFU_per_100mL','total_surviving_fio_load','borehole_id','borehole_type','concentration_CFU_per_100mL']:
-            if col not in d.columns:
-                d[col] = np.nan
-        # Build per-row tooltip HTML for boreholes
-        try:
-            def _fmt(v):
-                return _format_large(v)
-            def _row_html(row: pd.Series) -> str:
-                bid = str(row.get('borehole_id') or '-')
-                btype = str(row.get('borehole_type') or '-')
-                conc = _fmt(row.get('concentration_CFU_per_100mL'))
-                lab = _fmt(row.get('lab_total_coliform_CFU_per_100mL'))
-                return (
-                    f"<div><b>{bid}</b> <small>({btype})</small><br>"
-                    f"Calculated Concentration(By Model): <b>{conc} </b> CFU/100mL<br>"
-                    f"Lab Total Coliform(E. coli): <b>{lab} </b> CFU/100mL<br>"
-                    f"</div>"
-                )
-            d['tooltip_html'] = d.apply(_row_html, axis=1)
-        except Exception:
-            d['tooltip_html'] = ''
+        d = d[BOREHOLE_VIEW_COLUMNS + ['conc_category']].copy()
         return d
 
-    bh_priv = prepare_bh(priv_bh, 'private')
-    bh_gov = prepare_bh(gov_bh, 'government')
-
-    # Derive lab-based categories and colors for comparison (outline)
-    def lab_color_from_value(v: float):
-        try:
-            x = float(v)
-        except Exception:
-            return [160, 160, 160, 180]
-        if pd.isna(x) or x < 0:
-            return [160, 160, 160, 180]
-        if x < 10: return [46, 204, 113, 220]
-        if x < 100: return [52, 152, 219, 220]
-        if x < 1000: return [243, 156, 18, 220]
-        return [231, 76, 60, 220]
-    for d in (bh_priv, bh_gov):
-        if not d.empty:
-            lab_vals = pd.to_numeric(d.get('lab_total_coliform_CFU_per_100mL', np.nan), errors='coerce')
-            d['lab_color_rgba'] = lab_vals.apply(lab_color_from_value)
+    bh_priv = prepare_bh(priv_bh)
+    bh_gov = prepare_bh(gov_bh)
 
     def color_from_cat(c: str):
         c = (c or '').lower()
@@ -288,63 +250,32 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
         # Public CARTO GL style (no token required)
         map_style = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'
 
-    # Add lightweight ward outline with hover-tooltips (ward name)
-    try:
-        p = config.INPUT_DATA_DIR / 'wards.geojson'
-        if p.exists():
-            with open(p, 'r', encoding='utf-8') as fh:
-                wards_geo = json.load(fh)
-            # Flatten fields for tooltip token replacement (avoid nested properties path)
-            try:
-                feats = wards_geo.get('features', [])
-                for f in feats:
-                    props = f.get('properties') or {}
-                    f['ward_label'] = props.get('ward_name') or ''
-                    f['div_name'] = props.get('div_name') or ''
-                    f['counc_name'] = props.get('counc_name') or ''
-                    f['dist_name'] = props.get('dist_name') or ''
-                    f['reg_name'] = props.get('reg_name') or ''
-                    f['tooltip_html'] = (
-                        f"<div><b>{f['ward_label']}</b><br><small>"
-                        f"Division: {f['div_name']} &nbsp;•&nbsp; Council: {f['counc_name']}<br>"
-                        f"District: {f['dist_name']} &nbsp;•&nbsp; Region: {f['reg_name']}"
-                        f"</small></div>"
-                    )
-            except Exception:
-                pass
-            layers.append(pdk.Layer(
-                'GeoJsonLayer',
-                data=wards_geo,
-                stroked=True,
-                filled=True,
-                get_fill_color='[0,0,0,0]',
-                get_line_color='[40,40,40,160]',
-                line_width_min_pixels=1,
-                pickable=True,
-                visible=bool(show_ward_boundaries),
-                id='layer-ward-outline'
-            ))
-    except Exception:
-        pass
-
-    # Unified tooltip content for all pickable layers
-    tooltip = {
-        'html': '{tooltip_html}',
-        'style': {
-            'backgroundColor': 'rgba(255,255,255,0.95)',
-            'color': '#111',
-            'fontSize': '12px',
-            'borderRadius': '6px',
-            'padding': '6px 8px',
-            'boxShadow': '0 2px 6px rgba(0,0,0,0.15)'
-        }
-    }
+    # Add ward outline only when requested to avoid large payloads
+    if show_ward_boundaries:
+        try:
+            p = config.INPUT_DATA_DIR / 'wards.geojson'
+            if p.exists():
+                with open(p, 'r', encoding='utf-8') as fh:
+                    wards_geo = json.load(fh)
+                layers.append(pdk.Layer(
+                    'GeoJsonLayer',
+                    data=wards_geo,
+                    stroked=True,
+                    filled=True,
+                    get_fill_color='[0,0,0,0]',
+                    get_line_color='[40,40,40,160]',
+                    line_width_min_pixels=1,
+                    pickable=False,
+                    visible=True,
+                    id='layer-ward-outline'
+                ))
+        except Exception:
+            pass
 
     deck = pdk.Deck(
         layers=layers,
         initial_view_state=view_state,
         map_style=map_style,
-        tooltip=tooltip,
     )
     if mapbox_token:
         deck.mapbox_key = mapbox_token
@@ -497,11 +428,8 @@ def main():
     deck = _webgl_deck(
         outs['priv_bh_dash'],
         outs['gov_bh_dash'],
-        outs['hh_loads_markers'],
         show_private=bool(toggled.get('show_private', True)),
         show_government=bool(toggled.get('show_government', True)),
-        
-        show_ward_load=False,
         show_ward_boundaries=bool(toggled.get('show_ward_boundaries', False)),
         highlight_borehole_id=tuned.get('highlight_borehole_id'),
         zoom_to_highlight=bool(tuned.get('zoom_to_highlight', True))
@@ -513,4 +441,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
