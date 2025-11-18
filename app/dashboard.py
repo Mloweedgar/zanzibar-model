@@ -15,6 +15,7 @@ import pydeck as pdk
 try:
     from app import fio_config as config  # normal absolute import when package is resolvable
     from app import fio_runner
+    from app import vector_tiles
 except Exception:
     import sys
     from pathlib import Path as _Path
@@ -24,6 +25,7 @@ except Exception:
         sys.path.insert(0, str(_parent_dir))
     from app import fio_config as config
     from app import fio_runner
+    from app import vector_tiles
 
 
 @st.cache_data(show_spinner=False)
@@ -193,28 +195,53 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
     for d in (bh_priv, bh_gov):
         if not d.empty:
             d['color_rgba'] = d['conc_category'].apply(color_from_cat)
+            if 'color_rgba' in d.columns:
+                cols = pd.DataFrame(d['color_rgba'].tolist(), columns=['color_r', 'color_g', 'color_b', 'color_a'], index=d.index)
+                for c in cols.columns:
+                    d[c] = cols[c]
     if not bh_priv.empty:
-        try:
-            bh_priv['size_px'] = float(5.0)
-        except Exception:
-            bh_priv['size_px'] = 5.0
+        bh_priv['line_r'] = 0
+        bh_priv['line_g'] = 0
+        bh_priv['line_b'] = 0
+        bh_priv['line_a'] = 0
     if not bh_gov.empty:
-        try:
-            bh_gov['size_px'] = float(7.0)
-        except Exception:
-            bh_gov['size_px'] = 7.0
-    # Government layer already uses a black stroke in the ScatterplotLayer config below
+        bh_gov[['line_r', 'line_g', 'line_b', 'line_a']] = [0, 0, 0, 220]
+
+    # Build and serve vector tiles for boreholes, falling back to legacy markers if unavailable
+    tile_port = int(os.getenv('TILE_SERVER_PORT', '8081'))
+    tiles_port = vector_tiles.ensure_tile_http_server(config.OUTPUT_DATA_DIR, port=tile_port)
+    tile_base = os.getenv('TILE_BASE_URL', f"http://localhost:{tiles_port}")
+    borehole_tile_url = vector_tiles.tile_url(tile_base, subdir='boreholes')
+    tile_layers = {}
+    if not bh_priv.empty:
+        tile_layers['private_boreholes'] = (
+            bh_priv,
+            ['tooltip_html', 'color_r', 'color_g', 'color_b', 'color_a', 'line_r', 'line_g', 'line_b', 'line_a']
+        )
+    if not bh_gov.empty:
+        tile_layers['government_boreholes'] = (
+            bh_gov,
+            ['tooltip_html', 'color_r', 'color_g', 'color_b', 'color_a', 'line_r', 'line_g', 'line_b', 'line_a']
+        )
+    if tile_layers:
+        vector_tiles.build_point_tile_pyramid(
+            tile_layers,
+            tiles_dir=config.BOREHOLE_TILES_DIR,
+            min_zoom=8,
+            max_zoom=16,
+            manifest_payload={"thresholds": [T1, T2, T3]},
+        )
 
     layers = []
     # Always create layers with explicit visibility; toggles control 'visible'
-    if not bh_priv.empty:
+    if 'private_boreholes' in tile_layers:
         layers.append(pdk.Layer(
-            'ScatterplotLayer',
-            data=bh_priv,
-            get_position='[long, lat]',
-            get_fill_color='color_rgba',
-            radius_min_pixels=5,
-            radius_max_pixels=5,
+            'MVTLayer',
+            data=borehole_tile_url,
+            layer_name='private_boreholes',
+            get_fill_color='[color_r, color_g, color_b, color_a]',
+            point_radius_min_pixels=5,
+            point_radius_max_pixels=5,
             pickable=True,
             auto_highlight=True,
             stroked=False,
@@ -222,19 +249,19 @@ def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFra
             visible=bool(show_private),
             id='layer-priv-bh'
         ))
-    if not bh_gov.empty:
+    if 'government_boreholes' in tile_layers:
         layers.append(pdk.Layer(
-            'ScatterplotLayer',
-            data=bh_gov,
-            get_position='[long, lat]',
-            get_fill_color='color_rgba',
-            radius_min_pixels=7,
-            radius_max_pixels=7,
+            'MVTLayer',
+            data=borehole_tile_url,
+            layer_name='government_boreholes',
+            get_fill_color='[color_r, color_g, color_b, color_a]',
+            get_line_color='[line_r, line_g, line_b, line_a]',
+            line_width_min_pixels=1.5,
+            point_radius_min_pixels=7,
+            point_radius_max_pixels=7,
             pickable=True,
             auto_highlight=True,
             stroked=True,
-            get_line_color='[0,0,0,220]',
-            line_width_min_pixels=1.5,
             opacity=0.95,
             visible=bool(show_government),
             id='layer-gov-bh'

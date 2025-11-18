@@ -5,3 +5,4 @@ streamlit==1.36.0
 requests==2.32.5
 scikit-learn==1.7.2
 pydeck==0.9.1
+mapbox-vector-tile==2.0.1

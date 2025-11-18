@@ -19,7 +19,7 @@ NITROGEN_SCALE_MAX = 45.0  # Fixed maximum scale value (kg N/year)
 try:
     from app import fio_config as config  # when executed as a script by Streamlit
     from app import n_runner
-    from app.streamlit_media import dataframe_to_media_url
+    from app import vector_tiles
 except Exception:
     import sys
     from pathlib import Path
@@ -29,7 +29,7 @@ except Exception:
         sys.path.insert(0, str(parent_dir))
     from app import fio_config as config
     from app import n_runner
-    from app.streamlit_media import dataframe_to_media_url
+    from app import vector_tiles
 
 
 def _format_large(x) -> str:
@@ -214,10 +214,24 @@ def _webgl_deck_nitrogen(nitrogen_data: pd.DataFrame, *, show_nitrogen_loads: bo
         nitrogen_df['size_px'] = nitrogen_df['nitrogen_load'].apply(size_from_load)
         nitrogen_df['nitrogen_color'] = nitrogen_df['nitrogen_intensity'].apply(color_from_nitrogen_intensity)
 
-    # Stream the dataset via the media endpoint when possible so we avoid
-    # pushing ~60MB payloads through the websocket while still keeping every
-    # point. Falls back to the dataframe locally.
-    nitrogen_layer_data = dataframe_to_media_url(nitrogen_df, label="nitrogen-loads") or nitrogen_df
+    if not nitrogen_df.empty:
+        cols = pd.DataFrame(nitrogen_df['nitrogen_color'].tolist(), columns=['color_r', 'color_g', 'color_b', 'color_a'], index=nitrogen_df.index)
+        for c in cols.columns:
+            nitrogen_df[c] = cols[c]
+
+    tile_port = int(os.getenv('TILE_SERVER_PORT', '8081'))
+    tiles_port = vector_tiles.ensure_tile_http_server(config.OUTPUT_DATA_DIR, port=tile_port)
+    tile_base = os.getenv('TILE_BASE_URL', f"http://localhost:{tiles_port}")
+    nitrogen_tile_url = vector_tiles.tile_url(tile_base, subdir='nitrogen')
+
+    if not nitrogen_df.empty:
+        vector_tiles.build_point_tile_pyramid(
+            {'nitrogen_loads': (nitrogen_df, ['tooltip_html', 'color_r', 'color_g', 'color_b', 'color_a', 'size_px'])},
+            tiles_dir=config.NITROGEN_TILES_DIR,
+            min_zoom=8,
+            max_zoom=16,
+            manifest_payload={'nitrogen_scale': [NITROGEN_SCALE_MIN, NITROGEN_SCALE_MAX]},
+        )
 
     layers = []
     view_state = pdk.ViewState(latitude=center[0], longitude=center[1], zoom=10, pitch=0)
@@ -225,13 +239,13 @@ def _webgl_deck_nitrogen(nitrogen_data: pd.DataFrame, *, show_nitrogen_loads: bo
     # Nitrogen load layer (color by load intensity, size by load magnitude)
     if not nitrogen_df.empty and show_nitrogen_loads:
         layers.append(pdk.Layer(
-            'ScatterplotLayer',
-            data=nitrogen_layer_data,
-            get_position='[long, lat]',
-            get_fill_color='nitrogen_color',
-            get_radius='size_px',
-            radius_min_pixels=3,
-            radius_max_pixels=15,
+            'MVTLayer',
+            data=nitrogen_tile_url,
+            layer_name='nitrogen_loads',
+            get_fill_color='[color_r, color_g, color_b, color_a]',
+            get_point_radius='size_px',
+            point_radius_min_pixels=3,
+            point_radius_max_pixels=15,
             pickable=True,
             auto_highlight=True,
             stroked=False,
