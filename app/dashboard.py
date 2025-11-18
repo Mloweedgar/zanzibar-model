@@ -70,15 +70,16 @@ def _format_large(x) -> str:
 
 def _load_outputs() -> Dict[str, pd.DataFrame]:
     outputs = {}
-    paths = {
-        'hh_loads_markers': config.DASH_TOILETS_MARKERS_PATH,
-        'hh_loads_heat': config.DASH_TOILETS_HEATMAP_PATH,
-        'priv_bh_dash': config.DASH_PRIVATE_BH_PATH,
-        'gov_bh_dash': config.DASH_GOVERNMENT_BH_PATH,
-        'bh_conc': config.FIO_CONCENTRATION_AT_BOREHOLES_PATH,
+    paths: Dict[str, tuple[Path, Optional[Path]]] = {
+        'hh_loads_markers': (config.DASH_TOILETS_MARKERS_PATH, None),
+        'hh_loads_heat': (config.DASH_TOILETS_HEATMAP_PATH, None),
+        'priv_bh_dash': (config.DASH_PRIVATE_BH_SMALL_PATH, config.DASH_PRIVATE_BH_PATH),
+        'gov_bh_dash': (config.DASH_GOVERNMENT_BH_SMALL_PATH, config.DASH_GOVERNMENT_BH_PATH),
+        'bh_conc': (config.FIO_CONCENTRATION_AT_BOREHOLES_PATH, None),
     }
-    for k, p in paths.items():
-        outputs[k] = pd.read_csv(p) if p.exists() else pd.DataFrame()
+    for key, (preferred, fallback) in paths.items():
+        path = preferred if preferred and preferred.exists() else fallback
+        outputs[key] = pd.read_csv(path) if path and path.exists() else pd.DataFrame()
     return outputs
 
 
@@ -512,5 +513,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-
 
