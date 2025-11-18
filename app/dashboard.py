@@ -27,11 +27,10 @@ except Exception:
 
 
 @st.cache_data(show_spinner=False)
-def _get_model_thresholds(_modified: float | None = None) -> tuple[float, float, float]:
+def _get_model_thresholds() -> tuple[float, float, float]:
     """Strictly load model-side thresholds (CFU/100mL) from calibration_mapping.json.
 
-    The ``_modified`` parameter is used only to invalidate Streamlit's cache when the
-    calibration file changes on disk.
+    Raises if the file or required fields are missing/invalid.
     """
     p = config.OUTPUT_DATA_DIR / 'calibration_mapping.json'
     if not p.exists():
@@ -71,12 +70,7 @@ def _format_large(x) -> str:
 
 
 @st.cache_data(show_spinner=False)
-def _load_outputs(_sig: Dict[str, float]) -> Dict[str, pd.DataFrame]:
-    """Load dashboard CSV outputs once and reuse across reruns.
-
-    The ``_sig`` argument should include file modification timestamps so Streamlit
-    invalidates the cache when new scenario results are written.
-    """
+def _load_outputs() -> Dict[str, pd.DataFrame]:
     outputs = {}
     paths = {
         'hh_loads_markers': config.DASH_TOILETS_MARKERS_PATH,
@@ -111,12 +105,12 @@ def _apply_template_to_state(params: Dict[str, Any]) -> None:
     except Exception:
         ss['pop_factor'] = 1.0
 
-def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFrame, *, show_private: bool = True, show_government: bool = True, show_ward_load: bool = False, show_ward_boundaries: bool = False, highlight_borehole_id: Optional[str] = None, zoom_to_highlight: bool = True, threshold_mtime: float | None = None):
+def _webgl_deck(priv_bh: pd.DataFrame, gov_bh: pd.DataFrame, toilets: pd.DataFrame, *, show_private: bool = True, show_government: bool = True, show_ward_load: bool = False, show_ward_boundaries: bool = False, highlight_borehole_id: Optional[str] = None, zoom_to_highlight: bool = True):
     """High-performance WebGL renderer using pydeck. Avoids clustering and handles large point sets smoothly."""
 
     center = [-6.165, 39.202]
     # Use calibrated model-side thresholds if available
-    T1, T2, T3 = _get_model_thresholds(threshold_mtime)
+    T1, T2, T3 = _get_model_thresholds()
 
     def prepare_bh(df: pd.DataFrame, default_type: str) -> pd.DataFrame:
         if df is None or df.empty:
@@ -394,9 +388,9 @@ def _tunable_controls(base: Dict[str, Any]) -> Dict[str, Any]:
     return scenario
 
 
-def _legend_and_toggles(defaults: Dict[str, bool], *, threshold_mtime: float | None = None) -> Dict[str, bool]:
+def _legend_and_toggles(defaults: Dict[str, bool]) -> Dict[str, bool]:
         # Load calibrated thresholds for legend labels (model-side, CFU/100mL)
-        t1, t2, t3 = _get_model_thresholds(threshold_mtime)
+        t1, t2, t3 = _get_model_thresholds()
         t1s, t2s, t3s = _format_large(t1), _format_large(t2), _format_large(t3)
         # Legend bar
         html = """
@@ -470,18 +464,6 @@ def main():
     sel = _scenario_selector()
     tuned = _tunable_controls(sel['params'])
 
-    # Capture file modification times to drive cache invalidation when outputs change
-    thresholds_path = config.OUTPUT_DATA_DIR / 'calibration_mapping.json'
-    threshold_mtime = thresholds_path.stat().st_mtime if thresholds_path.exists() else None
-    output_paths = {
-        'hh_loads_markers': config.DASH_TOILETS_MARKERS_PATH,
-        'hh_loads_heat': config.DASH_TOILETS_HEATMAP_PATH,
-        'priv_bh_dash': config.DASH_PRIVATE_BH_PATH,
-        'gov_bh_dash': config.DASH_GOVERNMENT_BH_PATH,
-        'bh_conc': config.FIO_CONCENTRATION_AT_BOREHOLES_PATH,
-    }
-    output_sig = {k: p.stat().st_mtime for k, p in output_paths.items() if p.exists()}
-
     # Single-submit scenario form: edits are buffered until submitted
     with st.sidebar.form('scenario_form'):
         st.markdown('#### Edit scenario settings')
@@ -504,27 +486,27 @@ def main():
                     'fecal_sludge_treatment_percent': float(fecal_sludge),
                 })
                 fio_runner.run_scenario(scenario_payload)
+                st.cache_data.clear()
         st.success('Scenario outputs updated.')
 
-    outs = _load_outputs(output_sig)
+    outs = _load_outputs()
     # Heatmap radius removed
     toggled = _legend_and_toggles({
         'show_private': bool(tuned.get('show_private', True)),
         'show_government': bool(tuned.get('show_government', True)),
         'show_ward_boundaries': bool(tuned.get('show_ward_boundaries', False)),
-    }, threshold_mtime=threshold_mtime)
+    })
     deck = _webgl_deck(
         outs['priv_bh_dash'],
         outs['gov_bh_dash'],
         outs['hh_loads_markers'],
         show_private=bool(toggled.get('show_private', True)),
         show_government=bool(toggled.get('show_government', True)),
-
+        
         show_ward_load=False,
         show_ward_boundaries=bool(toggled.get('show_ward_boundaries', False)),
         highlight_borehole_id=tuned.get('highlight_borehole_id'),
-        zoom_to_highlight=bool(tuned.get('zoom_to_highlight', True)),
-        threshold_mtime=threshold_mtime,
+        zoom_to_highlight=bool(tuned.get('zoom_to_highlight', True))
     )
     st.pydeck_chart(deck, use_container_width=True)
 
