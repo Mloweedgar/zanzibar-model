@@ -10,6 +10,8 @@ import pandas as pd
 import numpy as np
 import pydeck as pdk
 
+from app import tile_server
+
 # Nitrogen dashboard configuration - CHANGE SCALE VALUES HERE ONLY
 NITROGEN_SCALE_MIN = 20.0  # Fixed minimum scale value (kg N/year)
 NITROGEN_SCALE_MAX = 45.0  # Fixed maximum scale value (kg N/year)
@@ -82,158 +84,33 @@ def _apply_template_to_state(params: Dict[str, Any]) -> None:
         ss['pop_factor'] = 1.0
 
 
-def _webgl_deck_nitrogen(nitrogen_data: pd.DataFrame, *, show_nitrogen_loads: bool = True, show_ward_boundaries: bool = False):
-    """High-performance WebGL renderer for nitrogen data using pydeck."""
+def _webgl_deck_nitrogen(*, show_nitrogen_loads: bool = True, show_ward_boundaries: bool = False):
+    """High-performance WebGL renderer backed by the local tile server."""
 
     center = [-6.165, 39.202]
-
-    def prepare_nitrogen_data(df: pd.DataFrame) -> pd.DataFrame:
-        if df is None or df.empty:
-            return pd.DataFrame(columns=['id', 'lat', 'long', 'toilet_category_id', 'nitrogen_load'])
-        # Keep only needed columns early to reduce memory/transport size
-        keep_cols = ['id', 'lat', 'long', 'toilet_category_id', 'nitrogen_load']
-        present = [c for c in keep_cols if c in df.columns]
-        d = df[present].dropna(subset=['lat', 'long']).copy()
-        # Downcast dtypes to minimize payload
-        try:
-            if 'lat' in d.columns: d['lat'] = pd.to_numeric(d['lat'], errors='coerce').astype('float32')
-            if 'long' in d.columns: d['long'] = pd.to_numeric(d['long'], errors='coerce').astype('float32')
-            if 'nitrogen_load' in d.columns: d['nitrogen_load'] = pd.to_numeric(d['nitrogen_load'], errors='coerce').astype('float32')
-            if 'toilet_category_id' in d.columns: d['toilet_category_id'] = pd.to_numeric(d['toilet_category_id'], errors='coerce').fillna(0).astype('int8')
-        except Exception:
-            pass
-
-        # If the dataset is very large, sample to stay under Streamlit message limits
-        # Target max rows ~120k to keep payload < 200 MB post-serialization
-        MAX_POINTS = 120_000
-        if len(d) > MAX_POINTS:
-            # Stratified sampling by toilet type to preserve composition
-            try:
-                d = d.groupby('toilet_category_id', group_keys=False, observed=True).apply(
-                    lambda g: g.sample(n=max(1, int(len(g) * (MAX_POINTS / len(df)))), random_state=42)
-                )
-            except Exception:
-                d = d.sample(n=MAX_POINTS, random_state=42)
-        
-        # Use the scale constants defined at the top of the function
-        
-        def nitrogen_color_intensity(load: float) -> float:
-            """Convert nitrogen load to color intensity (0-1) for fixed scale"""
-            try:
-                x = float(load)
-                if pd.isna(x) or x < 0:
-                    return 0.0
-                # Normalize to 0-1 scale
-                intensity = (x - NITROGEN_SCALE_MIN) / (NITROGEN_SCALE_MAX - NITROGEN_SCALE_MIN)
-                return max(0.0, min(1.0, intensity))  # Clamp to [0,1]
-            except Exception:
-                return 0.0
-        
-        d['nitrogen_intensity'] = d['nitrogen_load'].apply(nitrogen_color_intensity)
-        
-        # Create toilet type labels
-        def toilet_type_label(cat_id: int) -> str:
-            cat_map = {1: 'Sewered', 2: 'Pit Latrine', 3: 'Septic', 4: 'Open Defecation'}
-            return cat_map.get(int(cat_id), 'Unknown')
-        
-        d['toilet_type_label'] = d['toilet_category_id'].apply(toilet_type_label)
-        
-        # Build tooltip HTML (disable for very large datasets to reduce payload)
-        try:
-            if len(d) <= 60_000:
-                def _row_html(row: pd.Series) -> str:
-                    toilet_id = str(row.get('id') or '-')
-                    toilet_type = str(row.get('toilet_type_label') or '-')
-                    nitrogen_load = _format_large(row.get('nitrogen_load'))
-                    return (
-                        f"<div><b>Toilet ID: {toilet_id}</b><br>"
-                        f"Type: <b>{toilet_type}</b><br>"
-                        f"Nitrogen Load: <b>{nitrogen_load} kg N/year</b><br>"
-                        f"</div>"
-                    )
-                d['tooltip_html'] = d.apply(_row_html, axis=1)
-            else:
-                d['tooltip_html'] = ''
-        except Exception:
-            d['tooltip_html'] = ''
-        
-        return d
-
-    nitrogen_df = prepare_nitrogen_data(nitrogen_data)
-
-    # Fixed scale color scheme - continuous gradient from green to red
-    def color_from_nitrogen_intensity(intensity: float) -> list:
-        """Convert intensity (0-1) to color gradient from green to red"""
-        try:
-            intensity = float(intensity)
-            intensity = max(0.0, min(1.0, intensity))  # Clamp to [0,1]
-        except Exception:
-            intensity = 0.0
-        
-        # Color gradient: green (low) -> yellow -> orange -> red (high)
-        if intensity < 0.33:
-            # Green to yellow
-            ratio = intensity / 0.33
-            r = int(46 + (255 - 46) * ratio)
-            g = 255
-            b = int(113 - 113 * ratio)
-        elif intensity < 0.66:
-            # Yellow to orange
-            ratio = (intensity - 0.33) / 0.33
-            r = 255
-            g = int(255 - 99 * ratio)
-            b = 0
-        else:
-            # Orange to red
-            ratio = (intensity - 0.66) / 0.34
-            r = 255
-            g = int(156 - 80 * ratio)
-            b = int(18 - 18 * ratio)
-        
-        return [r, g, b, 200]  # Alpha = 200 for transparency
-
-    # removed toilet type color mapping from nitrogen view
-
-    # Fixed scale size based on nitrogen load
-    def size_from_load(load: float) -> float:
-        try:
-            x = float(load)
-            if pd.isna(x) or x < 0:
-                return 3.0
-            # Fixed scale: 3-12 pixels based on fixed range
-            # Normalize to 0-1 then scale to 3-12
-            intensity = (x - NITROGEN_SCALE_MIN) / (NITROGEN_SCALE_MAX - NITROGEN_SCALE_MIN)
-            intensity = max(0.0, min(1.0, intensity))
-            return 3.0 + (intensity * 9.0)  # 3-12 pixel range
-        except Exception:
-            return 3.0
-
-    if not nitrogen_df.empty:
-        nitrogen_df['size_px'] = nitrogen_df['nitrogen_load'].apply(size_from_load)
-        nitrogen_df['nitrogen_color'] = nitrogen_df['nitrogen_intensity'].apply(color_from_nitrogen_intensity)
+    tile_server.start_tile_server()
+    tile_url = tile_server.tile_url(limit=tile_server.MAX_FEATURES_PER_RESPONSE)
 
     layers = []
     view_state = pdk.ViewState(latitude=center[0], longitude=center[1], zoom=10, pitch=0)
 
-    # Nitrogen load layer (color by load intensity, size by load magnitude)
-    if not nitrogen_df.empty and show_nitrogen_loads:
-        layers.append(pdk.Layer(
-            'ScatterplotLayer',
-            data=nitrogen_df,
-            get_position='[long, lat]',
-            get_fill_color='nitrogen_color',
-            get_radius='size_px',
-            radius_min_pixels=3,
-            radius_max_pixels=15,
-            pickable=True,
-            auto_highlight=True,
-            stroked=False,
-            opacity=0.7,
-            visible=bool(show_nitrogen_loads),
-            id='layer-nitrogen-loads'
-        ))
-
-    # removed toilet type layer; shown in dedicated dashboard
+    if show_nitrogen_loads:
+        layers.append(
+            pdk.Layer(
+                'MVTLayer',
+                data=tile_url,
+                pickable=True,
+                auto_highlight=True,
+                filled=True,
+                point_type='circle',
+                get_fill_color='@=[properties.n_color_r, properties.n_color_g, properties.n_color_b, properties.n_color_a]',
+                get_radius='properties.radius',
+                point_radius_min_pixels=3,
+                point_radius_max_pixels=15,
+                visible=bool(show_nitrogen_loads),
+                id='layer-nitrogen-mvt',
+            )
+        )
 
     # Ward boundaries
     try:
@@ -241,42 +118,38 @@ def _webgl_deck_nitrogen(nitrogen_data: pd.DataFrame, *, show_nitrogen_loads: bo
         if p.exists():
             with open(p, 'r', encoding='utf-8') as fh:
                 wards_geo = json.load(fh)
-            # Flatten fields for tooltip
-            try:
-                feats = wards_geo.get('features', [])
-                for f in feats:
-                    props = f.get('properties') or {}
-                    f['ward_label'] = props.get('ward_name') or ''
-                    f['div_name'] = props.get('div_name') or ''
-                    f['counc_name'] = props.get('counc_name') or ''
-                    f['dist_name'] = props.get('dist_name') or ''
-                    f['reg_name'] = props.get('reg_name') or ''
-                    f['tooltip_html'] = (
-                        f"<div><b>{f['ward_label']}</b><br><small>"
-                        f"Division: {f['div_name']} &nbsp;•&nbsp; Council: {f['counc_name']}<br>"
-                        f"District: {f['dist_name']} &nbsp;•&nbsp; Region: {f['reg_name']}"
-                        f"</small></div>"
-                    )
-            except Exception:
-                pass
-            layers.append(pdk.Layer(
-                'GeoJsonLayer',
-                data=wards_geo,
-                stroked=True,
-                filled=True,
-                get_fill_color='[0,0,0,0]',
-                get_line_color='[40,40,40,160]',
-                line_width_min_pixels=1,
-                pickable=True,
-                visible=bool(show_ward_boundaries),
-                id='layer-ward-outline'
-            ))
+            feats = wards_geo.get('features', [])
+            for f in feats:
+                props = f.get('properties') or {}
+                f['ward_label'] = props.get('ward_name') or ''
+                f['div_name'] = props.get('div_name') or ''
+                f['counc_name'] = props.get('counc_name') or ''
+                f['dist_name'] = props.get('dist_name') or ''
+                f['reg_name'] = props.get('reg_name') or ''
+                f['tooltip_html'] = (
+                    f"<div><b>{f['ward_label']}</b><br><small>"
+                    f"Division: {f['div_name']} &nbsp;•&nbsp; Council: {f['counc_name']}<br>"
+                    f"District: {f['dist_name']} &nbsp;•&nbsp; Region: {f['reg_name']}"
+                    f"</small></div>"
+                )
+            layers.append(
+                pdk.Layer(
+                    'GeoJsonLayer',
+                    data=wards_geo,
+                    stroked=True,
+                    filled=True,
+                    get_fill_color='[0,0,0,0]',
+                    get_line_color='[40,40,40,160]',
+                    line_width_min_pixels=1,
+                    pickable=True,
+                    visible=bool(show_ward_boundaries),
+                    id='layer-ward-outline'
+                )
+            )
     except Exception:
         pass
 
     # Map style handling
-    map_style = None
-    mapbox_token = None
     try:
         mapbox_token = st.secrets.get('MAPBOX_API_KEY')  # type: ignore[attr-defined]
     except Exception:
@@ -286,9 +159,8 @@ def _webgl_deck_nitrogen(nitrogen_data: pd.DataFrame, *, show_nitrogen_loads: bo
     else:
         map_style = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'
 
-    # Tooltip
     tooltip = {
-        'html': '{tooltip_html}',
+        'html': '{properties.tooltip_html}',
         'style': {
             'backgroundColor': 'rgba(255,255,255,0.95)',
             'color': '#111',
@@ -420,12 +292,12 @@ def main():
         st.success('Nitrogen scenario outputs updated.')
 
     outs = _load_nitrogen_outputs()
-    
-    # Display summary statistics
+
+    # Display summary statistics and download
     if not outs['nitrogen_loads'].empty:
         nitrogen_data = outs['nitrogen_loads']
         col1, col2, col3 = st.columns(3)
-        
+
         with col1:
             st.metric("Total Households", f"{len(nitrogen_data):,}")
         with col2:
@@ -434,14 +306,23 @@ def main():
         with col3:
             max_load = nitrogen_data['nitrogen_load'].max()
             st.metric("Peak Load", f"{max_load:.1f} kg N/year")
+
+        st.download_button(
+            "Download full data (CSV)",
+            data=nitrogen_data.to_csv(index=False),
+            file_name="net_nitrogen_load_from_households.csv",
+            mime="text/csv",
+            help="Exports the full dataset without tiling limits",
+        )
     
     toggled = _legend_and_toggles({
         'show_nitrogen_loads': bool(tuned.get('show_nitrogen_loads', True)),
         'show_ward_boundaries': bool(tuned.get('show_ward_boundaries', False)),
     })
     
+    st.caption(f"Vector tiles served locally on port {tile_server.TILE_SERVER_PORT} (limit {tile_server.MAX_FEATURES_PER_RESPONSE} features per request)")
+
     deck = _webgl_deck_nitrogen(
-        outs['nitrogen_loads'],
         show_nitrogen_loads=bool(toggled.get('show_nitrogen_loads', True)),
         show_ward_boundaries=bool(toggled.get('show_ward_boundaries', False))
     )

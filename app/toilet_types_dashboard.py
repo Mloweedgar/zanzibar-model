@@ -8,6 +8,8 @@ import pandas as pd
 import numpy as np
 import pydeck as pdk
 
+from app import tile_server
+
 try:
     from app import fio_config as config
 except Exception:
@@ -101,6 +103,14 @@ def main():
         od_count = len(df[df['toilet_category_id'] == 4])
         st.metric("Open Defecation", f"{od_count:,}")
 
+    st.download_button(
+        "Download full data (CSV)",
+        data=df.to_csv(index=False),
+        file_name="net_nitrogen_load_from_households.csv",
+        mime="text/csv",
+        help="Full dataset without viewport limits",
+    )
+
     # derive colors
     df['toilet_color'] = df['toilet_category_id'].apply(_color_from_toilet_type)
 
@@ -132,10 +142,7 @@ def main():
     # Ward boundaries toggle
     show_ward_boundaries = st.checkbox('Ward boundaries', value=False)
 
-    # Filter data based on checkbox selections
-    filtered_data = df.copy()
-    
-    # Create a list to track which categories to show
+    # Build tile-backed map
     categories_to_show = []
     if show_sewered:
         categories_to_show.append(1)
@@ -145,34 +152,29 @@ def main():
         categories_to_show.append(3)
     if show_open_defecation:
         categories_to_show.append(4)
-    
-    # Filter the dataframe
-    if categories_to_show:
-        filtered_data = filtered_data[filtered_data['toilet_category_id'].isin(categories_to_show)]
-    else:
-        # If no categories are selected, show empty dataframe
-        filtered_data = filtered_data[filtered_data['toilet_category_id'] == -1]
 
     view_state = pdk.ViewState(latitude=-6.165, longitude=39.202, zoom=10, pitch=0)
     layers = []
-    
-    # Only create the layer if there's data to show
-    if not filtered_data.empty:
-        layer = pdk.Layer(
-            'ScatterplotLayer',
-            data=filtered_data,
-            get_position='[long, lat]',
-            get_fill_color='toilet_color',
-            radius_min_pixels=4,
-            radius_max_pixels=4,
-            pickable=False,
-            stroked=True,
-            get_line_color='[0,0,0,100]',
-            line_width_min_pixels=1,
-            opacity=0.85,
-            id='layer-toilet-types-only'
+
+    tile_server.start_tile_server()
+    if categories_to_show:
+        layers.append(
+            pdk.Layer(
+                'MVTLayer',
+                data=tile_server.tile_url(categories=categories_to_show, limit=tile_server.MAX_FEATURES_PER_RESPONSE),
+                pickable=False,
+                filled=True,
+                point_type='circle',
+                get_fill_color='@=[properties.t_color_r, properties.t_color_g, properties.t_color_b, properties.t_color_a]',
+                get_radius=4,
+                point_radius_min_pixels=4,
+                point_radius_max_pixels=4,
+                opacity=0.85,
+                id='layer-toilet-types-mvt'
+            )
         )
-        layers.append(layer)
+    else:
+        st.info('Select at least one toilet type to display tiles.')
 
     # Ward boundaries layer (optional)
     if show_ward_boundaries:
@@ -196,7 +198,12 @@ def main():
         except Exception:
             pass
 
-    deck = pdk.Deck(layers=layers, initial_view_state=view_state, map_style='https://basemaps.cartocdn.com/gl/positron-gl-style/style.json')
+    deck = pdk.Deck(
+        layers=layers,
+        initial_view_state=view_state,
+        map_style='https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+    )
+    st.caption(f"Tiles served locally on port {tile_server.TILE_SERVER_PORT} (limit {tile_server.MAX_FEATURES_PER_RESPONSE} features per request)")
     st.pydeck_chart(deck, use_container_width=True)
 
 
