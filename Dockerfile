@@ -22,7 +22,7 @@ ENV PYTHONPATH=/app \
     FIO_MAX_POINTS=3000 \
     FIO_READ_NROWS=6000
 
-EXPOSE 8501
+EXPOSE 8501 8081
 
 CMD ["streamlit", "run", "app/dashboard.py", "--server.port=8501", "--server.headless=true", "--server.address=0.0.0.0"]
 

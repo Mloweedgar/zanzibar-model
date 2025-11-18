@@ -8,8 +8,11 @@ services:
       - PYTHONPATH=/app
       - FIO_MAX_POINTS=3000
       - FIO_READ_NROWS=6000
+      - TILE_BASE_URL=/
+      - TILE_SERVER_PORT=8081
     expose:
       - "8501"
+      - "8081"
     volumes:
       - ../.streamlit/secrets.toml:/root/.streamlit/secrets.toml:ro
   nginx:
