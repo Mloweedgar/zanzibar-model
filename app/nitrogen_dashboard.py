@@ -49,13 +49,21 @@ def _format_large(x) -> str:
         return "-"
 
 
+@st.cache_data(show_spinner=False)
+def _read_csv_cached(path: str, mtime: float | None) -> pd.DataFrame:
+    if not mtime:
+        return pd.DataFrame()
+    return pd.read_csv(path)
+
+
 def _load_nitrogen_outputs() -> Dict[str, pd.DataFrame]:
     outputs = {}
     paths = {
         'nitrogen_loads': config.NET_NITROGEN_LOAD_PATH,
     }
     for k, p in paths.items():
-        outputs[k] = pd.read_csv(p) if p.exists() else pd.DataFrame()
+        mtime = p.stat().st_mtime if p.exists() else None
+        outputs[k] = _read_csv_cached(str(p), mtime)
     return outputs
 
 
