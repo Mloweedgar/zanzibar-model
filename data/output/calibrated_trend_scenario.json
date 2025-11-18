@@ -4,8 +4,8 @@
     "label": "Current situation (status quo)",
     "description": "No interventions applied.",
     "pop_factor": 1.0,
-    "EFIO_override": 8960000000.0,
-    "ks_per_m": 0.003,
+    "EFIO_override": 100000000.0,
+    "ks_per_m": 0.5,
     "radius_by_type": {
       "private": 35,
       "government": 100
