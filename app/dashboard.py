@@ -49,7 +49,7 @@ def get_color(val, min_val, max_val, palette='red'):
 
 # --- Views ---
 
-def view_pathogen_risk(map_style):
+def view_pathogen_risk(map_style, viz_type="Scatterplot"):
     st.header("🦠 Pathogen Risk (E. coli)")
     
     df = load_data(config.FIO_CONCENTRATION_PATH)
@@ -71,15 +71,26 @@ def view_pathogen_risk(map_style):
     df['color'] = df['concentration_CFU_per_100mL'].apply(lambda x: get_color(np.log1p(x), 0, np.log1p(1000)))
     df['radius'] = df['concentration_CFU_per_100mL'].apply(lambda x: 5 + np.clip(x/10, 0, 20))
     
-    layer = pdk.Layer(
-        "ScatterplotLayer",
-        df,
-        get_position=['long', 'lat'],
-        get_fill_color='color',
-        get_radius='radius',
-        pickable=True,
-        auto_highlight=True
-    )
+    if viz_type == "Heatmap":
+        layer = pdk.Layer(
+            "HeatmapLayer",
+            df,
+            get_position=['long', 'lat'],
+            get_weight='concentration_CFU_per_100mL',
+            radiusPixels=50,
+            intensity=1,
+            threshold=0.1
+        )
+    else:
+        layer = pdk.Layer(
+            "ScatterplotLayer",
+            df,
+            get_position=['long', 'lat'],
+            get_fill_color='color',
+            get_radius='radius',
+            pickable=True,
+            auto_highlight=True
+        )
     
     st.pydeck_chart(pdk.Deck(
         layers=[layer],
@@ -88,7 +99,7 @@ def view_pathogen_risk(map_style):
         tooltip={"text": "ID: {id}\nConc: {concentration_CFU_per_100mL} CFU"}
     ))
 
-def view_nitrogen_load(map_style):
+def view_nitrogen_load(map_style, viz_type="Scatterplot"):
     st.header("🌱 Nitrogen Load")
     
     df = load_data(config.NET_NITROGEN_LOAD_PATH)
@@ -102,14 +113,25 @@ def view_nitrogen_load(map_style):
     # Map
     df['color'] = df['nitrogen_load'].apply(lambda x: get_color(x, 0, 50, palette='blue'))
     
-    layer = pdk.Layer(
-        "ScatterplotLayer",
-        df.sample(min(len(df), 20000)), # Sample for performance
-        get_position=['long', 'lat'],
-        get_fill_color='color',
-        get_radius=20,
-        pickable=True
-    )
+    if viz_type == "Heatmap":
+        layer = pdk.Layer(
+            "HeatmapLayer",
+            df,
+            get_position=['long', 'lat'],
+            get_weight='nitrogen_load',
+            radiusPixels=40,
+            intensity=1,
+            threshold=0.05
+        )
+    else:
+        layer = pdk.Layer(
+            "ScatterplotLayer",
+            df.sample(min(len(df), 20000)), # Sample for performance
+            get_position=['long', 'lat'],
+            get_fill_color='color',
+            get_radius=20,
+            pickable=True
+        )
     
     st.pydeck_chart(pdk.Deck(
         layers=[layer],
@@ -181,13 +203,20 @@ def main():
         st.success("Done!")
         st.experimental_rerun()
 
-    st.sidebar.markdown("---")
     with st.sidebar.expander("Settings"):
         st.markdown("**Map Style**")
         map_style = st.selectbox(
             "Theme", 
             ["Light", "Dark", "Satellite", "Road"],
             index=0
+        )
+        
+        st.markdown("**Visualization**")
+        viz_type = st.selectbox(
+            "Type",
+            ["Scatterplot", "Heatmap"],
+            index=0,
+            help="Scatterplot shows individual points. Heatmap shows density/intensity."
         )
     
     style_map = {
@@ -199,11 +228,11 @@ def main():
     current_style = style_map.get(map_style, "mapbox://styles/mapbox/light-v9")
 
     if view == "Pathogen Risk":
-        view_pathogen_risk(current_style)
+        view_pathogen_risk(current_style, viz_type)
     elif view == "Nitrogen Load":
-        view_nitrogen_load(current_style)
+        view_nitrogen_load(current_style, viz_type)
     elif view == "Toilet Inventory":
-        view_toilet_inventory(current_style)
+        view_toilet_inventory(current_style) # Keep inventory as scatter for categorical clarity
 
 if __name__ == "__main__":
     main()
