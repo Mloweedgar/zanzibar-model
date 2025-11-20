@@ -165,22 +165,6 @@ def main():
     view = st.sidebar.radio("View", ["Pathogen Risk", "Nitrogen Load", "Toilet Inventory"])
     
     st.sidebar.markdown("---")
-    st.sidebar.subheader("Map Settings")
-    map_style = st.sidebar.selectbox(
-        "Map Style", 
-        ["Light", "Dark", "Satellite", "Road"],
-        index=0
-    )
-    
-    style_map = {
-        "Light": "mapbox://styles/mapbox/light-v9",
-        "Dark": "mapbox://styles/mapbox/dark-v9",
-        "Satellite": "mapbox://styles/mapbox/satellite-v9",
-        "Road": "mapbox://styles/mapbox/streets-v11"
-    }
-    current_style = style_map.get(map_style, "mapbox://styles/mapbox/light-v9")
-
-    st.sidebar.markdown("---")
     st.sidebar.subheader("Run Scenario")
     
     scenario_name = st.sidebar.selectbox("Scenario", list(config.SCENARIOS.keys()))
@@ -196,6 +180,23 @@ def main():
             engine.run_pipeline(model_type, scenario_name)
         st.success("Done!")
         st.experimental_rerun()
+
+    st.sidebar.markdown("---")
+    with st.sidebar.expander("Settings"):
+        st.markdown("**Map Style**")
+        map_style = st.selectbox(
+            "Theme", 
+            ["Light", "Dark", "Satellite", "Road"],
+            index=0
+        )
+    
+    style_map = {
+        "Light": "mapbox://styles/mapbox/light-v9",
+        "Dark": "mapbox://styles/mapbox/dark-v9",
+        "Satellite": "mapbox://styles/mapbox/satellite-v9",
+        "Road": "mapbox://styles/mapbox/streets-v11"
+    }
+    current_style = style_map.get(map_style, "mapbox://styles/mapbox/light-v9")
 
     if view == "Pathogen Risk":
         view_pathogen_risk(current_style)
