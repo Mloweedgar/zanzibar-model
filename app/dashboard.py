@@ -184,9 +184,14 @@ def main():
     st.sidebar.subheader("Run Scenario")
     
     scenario_name = st.sidebar.selectbox("Scenario", list(config.SCENARIOS.keys()))
-    model_type = st.sidebar.selectbox("Model", ["fio", "nitrogen"])
     
-    if st.sidebar.button("Run Pipeline"):
+    # Infer model type from view
+    if view == "Nitrogen Load":
+        model_type = "nitrogen"
+    else:
+        model_type = "fio"
+    
+    if st.sidebar.button(f"Run {model_type.upper()} Pipeline"):
         with st.spinner(f"Running {model_type}..."):
             engine.run_pipeline(model_type, scenario_name)
         st.success("Done!")
