@@ -1,118 +1,40 @@
-#!/usr/bin/env python3
-"""Entrypoint for FIO app: run pipeline or launch dashboard.
+"""Main CLI Entry Point for Zanzibar Model."""
 
-Usage:
-  python main.py pipeline [--scenario JSON_OR_NAME]
-  python main.py nitrogen-pipeline [--scenario JSON_OR_NAME]
-  python main.py dashboard
-  python main.py nitrogen-dashboard
-"""
-
-import sys
-import json
 import argparse
-from pathlib import Path
+import sys
+from app import engine
 
-from app import fio_runner
-from app import n_runner
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    sub = parser.add_subparsers(dest='cmd', required=True)
-
-    p1 = sub.add_parser('pipeline')
-    p1.add_argument('--scenario', default='crisis_2025_current')
-    p1.add_argument('--log-level', default='INFO', choices=['DEBUG','INFO','WARNING','ERROR'])
-
-    p1n = sub.add_parser('nitrogen-pipeline')
-    p1n.add_argument('--scenario', default='crisis_2025_current')
-    p1n.add_argument('--log-level', default='INFO', choices=['DEBUG','INFO','WARNING','ERROR'])
-
-    p2 = sub.add_parser('dashboard')
-    p2n = sub.add_parser('nitrogen-dashboard')
-    p2t = sub.add_parser('toilet-dashboard')
-    p3 = sub.add_parser('inspect-private-q')
-    p4 = sub.add_parser('derive-private-q')
-    p5 = sub.add_parser('derive-government-q')
-    p6 = sub.add_parser('calibrate')
-    p7 = sub.add_parser('calibrate-eff')
-    p8 = sub.add_parser('trend')
-
+def main():
+    parser = argparse.ArgumentParser(description="Zanzibar FIO/Nitrogen Model CLI")
+    subparsers = parser.add_subparsers(dest='command', help='Command to run')
+    
+    # Pipeline Command
+    pipe_parser = subparsers.add_parser('pipeline', help='Run the model pipeline')
+    pipe_parser.add_argument('--model', choices=['fio', 'nitrogen'], required=True, help='Model type to run')
+    pipe_parser.add_argument('--scenario', default='crisis_2025_current', help='Scenario name')
+    
+    # Dashboard Command
+    dash_parser = subparsers.add_parser('dashboard', help='Launch the dashboard')
+    
     args = parser.parse_args()
-
-    if args.cmd == 'pipeline':
-        fio_runner.setup_logging(args.log_level)
-        scenario = args.scenario
+    
+    if args.command == 'pipeline':
         try:
-            if isinstance(scenario, str) and scenario.startswith('{') and scenario.endswith('}'):
-                scenario = json.loads(scenario)
-        except json.JSONDecodeError:
-            pass
-        fio_runner.run_scenario(scenario)
-        return 0
-    if args.cmd == 'nitrogen-pipeline':
-        n_runner.setup_logging(args.log_level)
-        scenario = args.scenario
-        try:
-            if isinstance(scenario, str) and scenario.startswith('{') and scenario.endswith('}'):
-                scenario = json.loads(scenario)
-        except json.JSONDecodeError:
-            pass
-        n_runner.run_scenario(scenario)
-        return 0
-    if args.cmd == 'dashboard':
-        # Launch Streamlit by module to ensure package context
-        import subprocess
-        subprocess.run([sys.executable, "-m", "streamlit", "run", "app/dashboard.py", "--server.port", "8502"], check=False)
-        return 0
-    if args.cmd == 'nitrogen-dashboard':
-        # Launch nitrogen dashboard directly
-        import subprocess
-        subprocess.run([sys.executable, "-m", "streamlit", "run", "app/nitrogen_dashboard.py", "--server.port", "8503"], check=False)
-        return 0
-    if args.cmd == 'toilet-dashboard':
-        # Launch toilet types dashboard directly
-        import subprocess
-        subprocess.run([sys.executable, "-m", "streamlit", "run", "app/toilet_types_dashboard.py", "--server.port", "8504"], check=False)
-        return 0
-    if args.cmd == 'inspect-private-q':
-        from app.preprocess_boreholes import extract_private_q_uniques
-        extract_private_q_uniques()
-        print("Saved unique value summaries to data/output/")
-        return 0
-    if args.cmd == 'derive-private-q':
-        from app.preprocess_boreholes import derive_private_Q_L_per_day
-        out = derive_private_Q_L_per_day()
-        print(f"Saved enriched private boreholes to {out}")
-        return 0
-    if args.cmd == 'derive-government-q':
-        from app.preprocess_boreholes import derive_government_Q_L_per_day
-        out = derive_government_Q_L_per_day()
-        print(f"Saved enriched government boreholes to {out}")
-        return 0
-    if args.cmd == 'calibrate':
-        from app.calibrate import run_calibration
-        rep = run_calibration()
-        print("Calibration finished. Best:")
-        print(json.dumps(rep.get('best', {}), indent=2))
-        return 0
-    if args.cmd == 'calibrate-eff':
-        from app.calibrate import run_efficiency_calibration
-        rep = run_efficiency_calibration()
-        print("Efficiency calibration finished. Best:")
-        print(json.dumps(rep.get('best', {}), indent=2))
-        return 0
-    if args.cmd == 'trend':
-        from app.calibrate import run_trend_search
-        rep = run_trend_search()
-        print("Trend search finished. Best by Spearman:")
-        print(json.dumps(rep.get('best_by_spearman', {}), indent=2))
-        return 0
-    return 1
+            engine.run_pipeline(args.model, args.scenario)
+            print("Pipeline completed successfully.")
+        except Exception as e:
+            print(f"Error: {e}")
+            sys.exit(1)
+            
+    elif args.command == 'dashboard':
+        import os
+        print("Launching dashboard...")
+        # Force PYTHONPATH to include current directory first to avoid name collisions
+        cwd = os.getcwd()
+        os.system(f"PYTHONPATH='{cwd}:$PYTHONPATH' streamlit run app/dashboard.py")
+        
+    else:
+        parser.print_help()
 
-
-if __name__ == '__main__':
-    sys.exit(main())
-
-
+if __name__ == "__main__":
+    main()

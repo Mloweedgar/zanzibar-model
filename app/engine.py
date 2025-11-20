@@ -1,0 +1,279 @@
+"""Core Engine for Zanzibar Pathogen & Nitrogen Model.
+
+Handles:
+1. Data Loading & Standardization
+2. Intervention Application (Scenario Logic)
+3. Layer 1: Load Calculation (Polymorphic: FIO vs Nitrogen)
+4. Layer 2: Transport (Vectorized BallTree)
+5. Layer 3: Concentration (Dilution)
+"""
+
+import logging
+import numpy as np
+import pandas as pd
+from pathlib import Path
+from dataclasses import dataclass
+from typing import Dict, Any, Optional, Literal
+from sklearn.neighbors import BallTree
+
+from . import config
+
+# Setup Logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+@dataclass
+class PollutantConfig:
+    """Configuration for a specific pollutant type."""
+    name: Literal['fio', 'nitrogen']
+    output_load_path: Path
+    output_conc_path: Optional[Path] = None
+    
+    # FIO specific
+    efio: float = 0.0
+    decay_rate: float = 0.0
+    
+    # Nitrogen specific
+    protein_per_capita: float = 0.0
+    protein_conversion: float = 0.0
+
+def _get_pollutant_config(model_type: str, scenario: Dict[str, Any]) -> PollutantConfig:
+    if model_type == 'fio':
+        return PollutantConfig(
+            name='fio',
+            output_load_path=config.FIO_LOAD_PATH,
+            output_conc_path=config.FIO_CONCENTRATION_PATH,
+            efio=scenario.get('EFIO_override', config.EFIO_DEFAULT),
+            decay_rate=scenario.get('ks_per_m', config.KS_PER_M_DEFAULT)
+        )
+    elif model_type == 'nitrogen':
+        return PollutantConfig(
+            name='nitrogen',
+            output_load_path=config.NET_NITROGEN_LOAD_PATH,
+            protein_per_capita=scenario.get('protein_per_capita_override', config.PROTEIN_PER_CAPITA_DEFAULT),
+            protein_conversion=scenario.get('protein_to_nitrogen_conversion_override', config.PROTEIN_TO_NITROGEN_CONVERSION)
+        )
+    else:
+        raise ValueError(f"Unknown model type: {model_type}")
+
+# --- Step 1: Standardization & Interventions ---
+
+def load_and_standardize_sanitation() -> pd.DataFrame:
+    """Load raw sanitation data and standardize columns."""
+    if config.SANITATION_STANDARDIZED_PATH.exists():
+        logging.info(f"Loading standardized sanitation from {config.SANITATION_STANDARDIZED_PATH}")
+        return pd.read_csv(config.SANITATION_STANDARDIZED_PATH)
+
+    logging.info(f"Standardizing raw data from {config.SANITATION_RAW_PATH}")
+    df = pd.read_csv(config.SANITATION_RAW_PATH)
+    
+    # Rename columns
+    df = df.rename(columns={k: v for k, v in config.SANITATION_COLUMN_MAPPING.items() if k in df.columns})
+    
+    # Ensure required columns
+    required = ['id', 'lat', 'long', 'toilet_category_id']
+    if not all(c in df.columns for c in required):
+        raise ValueError(f"Missing columns. Found: {df.columns}, Required: {required}")
+
+    # Clean types
+    df['lat'] = pd.to_numeric(df['lat'], errors='coerce')
+    df['long'] = pd.to_numeric(df['long'], errors='coerce')
+    df = df.dropna(subset=['lat', 'long'])
+    
+    # Defaults
+    df['household_population'] = df.get('household_population', config.HOUSEHOLD_POPULATION_DEFAULT)
+    df['pathogen_containment_efficiency'] = df['toilet_category_id'].map(config.CONTAINMENT_EFFICIENCY_DEFAULT).fillna(0.0)
+    
+    # Save
+    config.SANITATION_STANDARDIZED_PATH.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(config.SANITATION_STANDARDIZED_PATH, index=False)
+    return df
+
+def apply_interventions(df: pd.DataFrame, scenario: Dict[str, Any]) -> pd.DataFrame:
+    """Apply scenario interventions (population growth, toilet upgrades)."""
+    df = df.copy()
+    
+    # 1. Population Growth
+    pop_factor = scenario.get('pop_factor', 1.0)
+    df['household_population'] *= pop_factor
+    
+    # 2. Efficiency Overrides
+    eff_map = config.CONTAINMENT_EFFICIENCY_DEFAULT.copy()
+    if 'efficiency_override' in scenario:
+        eff_map.update({int(k): float(v) for k, v in scenario['efficiency_override'].items()})
+    
+    # Helper to split rows (preserve mass)
+    def convert_fraction(mask, fraction, new_cat_id, new_eff):
+        if not mask.any() or fraction <= 0:
+            return
+        
+        # Rows to convert
+        converted = df[mask].copy()
+        converted['household_population'] *= fraction
+        converted['toilet_category_id'] = new_cat_id
+        converted['pathogen_containment_efficiency'] = new_eff
+        
+        # Reduce pop in original rows
+        df.loc[mask, 'household_population'] *= (1 - fraction)
+        
+        # Append converted
+        return converted
+
+    new_rows = []
+    
+    # OD Reduction -> Septic
+    od_red = scenario.get('od_reduction_percent', 0.0) / 100.0
+    if od_red > 0:
+        res = convert_fraction(df['toilet_category_id'] == 4, od_red, 3, eff_map[3])
+        if res is not None: new_rows.append(res)
+
+    # Pit Upgrade -> Septic
+    pit_up = scenario.get('infrastructure_upgrade_percent', 0.0) / 100.0
+    if pit_up > 0:
+        res = convert_fraction(df['toilet_category_id'] == 2, pit_up, 3, eff_map[3])
+        if res is not None: new_rows.append(res)
+
+    # Fecal Sludge Treatment (Septic -> Better Septic/Sewer eff)
+    fst = scenario.get('fecal_sludge_treatment_percent', 0.0) / 100.0
+    if fst > 0:
+        # Assume treated septic reaches 80% efficiency
+        res = convert_fraction(df['toilet_category_id'] == 3, fst, 3, 0.80)
+        if res is not None: new_rows.append(res)
+
+    if new_rows:
+        df = pd.concat([df] + new_rows, ignore_index=True)
+
+    # Centralized Treatment (Sewer efficiency boost)
+    if scenario.get('centralized_treatment_enabled'):
+        df.loc[df['toilet_category_id'] == 1, 'pathogen_containment_efficiency'] = 0.90
+
+    # Recalculate efficiency for non-overridden rows just in case
+    # (Logic simplified: we updated specific rows, so we trust the column now)
+    
+    return df[df['household_population'] > 0].reset_index(drop=True)
+
+# --- Step 2: Layer 1 Calculation ---
+
+def compute_load(df: pd.DataFrame, pcfg: PollutantConfig) -> pd.DataFrame:
+    """Compute initial pollutant load per household."""
+    df = df.copy()
+    leakage = 1.0 - df['pathogen_containment_efficiency']
+    
+    if pcfg.name == 'fio':
+        # Load = Pop * EFIO * Leakage
+        df['load'] = df['household_population'] * pcfg.efio * leakage
+    else:
+        # Nitrogen = Pop * Protein * Conversion * Leakage * 365
+        df['load'] = (df['household_population'] * 
+                      pcfg.protein_per_capita * 
+                      pcfg.protein_conversion * 
+                      leakage * 365)
+    
+    if pcfg.name == 'nitrogen':
+        df = df.rename(columns={'load': 'nitrogen_load'})
+    
+    # Save intermediate
+    df.to_csv(pcfg.output_load_path, index=False)
+    logging.info(f"Saved Layer 1 load to {pcfg.output_load_path}")
+    return df
+
+# --- Step 3: Layer 2 Transport (Vectorized) ---
+
+def run_transport(toilets: pd.DataFrame, boreholes: pd.DataFrame, pcfg: PollutantConfig, radius_m: float) -> pd.DataFrame:
+    """Link toilets to boreholes and compute decayed load using Vectorized BallTree."""
+    if pcfg.name != 'fio':
+        logging.info("Skipping transport layer for Nitrogen (not required).")
+        return pd.DataFrame()
+
+    logging.info(f"Running Transport Layer (Radius: {radius_m}m, Decay: {pcfg.decay_rate})")
+    
+    # Convert to radians for BallTree
+    t_rad = np.radians(toilets[['lat', 'long']].values)
+    b_rad = np.radians(boreholes[['lat', 'long']].values)
+    
+    tree = BallTree(t_rad, metric='haversine')
+    
+    # Query all boreholes at once (or in chunks if memory is tight, but 20k is fine)
+    # query_radius returns array of arrays of indices
+    radius_rad = radius_m / config.EARTH_RADIUS_M
+    indices, distances = tree.query_radius(b_rad, r=radius_rad, return_distance=True)
+    
+    # Vectorized accumulation
+    total_loads = np.zeros(len(boreholes))
+    
+    # Flatten for processing (this is still somewhat iterative but much faster than pure python loops)
+    # For true vectorization with variable length neighbors, we can use sparse matrices or simple iteration over the result arrays
+    # Given the density, simple iteration over the `indices` array (which is length N_boreholes) is fast enough in Python
+    # because the inner loop is avoided.
+    
+    toilet_loads = toilets['load'].values
+    
+    for i, (t_indices, t_dists) in enumerate(zip(indices, distances)):
+        if len(t_indices) == 0:
+            continue
+            
+        dists_m = t_dists * config.EARTH_RADIUS_M
+        decay_factors = np.exp(-pcfg.decay_rate * dists_m)
+        
+        # Sum of (Load * Decay)
+        total_loads[i] = np.sum(toilet_loads[t_indices] * decay_factors)
+        
+    boreholes = boreholes.copy()
+    boreholes['aggregated_load'] = total_loads
+    return boreholes
+
+# --- Step 4: Layer 3 Concentration ---
+
+def compute_concentration(boreholes: pd.DataFrame) -> pd.DataFrame:
+    """Convert aggregated load to concentration."""
+    # Conc = Load / Flow
+    # Ensure Q is present
+    if 'Q_L_per_day' not in boreholes.columns:
+        logging.warning("Q_L_per_day missing, using default 1000L")
+        boreholes['Q_L_per_day'] = 1000.0
+        
+    boreholes['concentration_CFU_per_100mL'] = (boreholes['aggregated_load'] / boreholes['Q_L_per_day']) * 100.0
+    return boreholes
+
+# --- Main Pipeline ---
+
+def run_pipeline(model_type: str, scenario_name: str = 'crisis_2025_current'):
+    scenario = config.SCENARIOS.get(scenario_name, config.SCENARIOS['crisis_2025_current'])
+    pcfg = _get_pollutant_config(model_type, scenario)
+    
+    logging.info(f"Starting {model_type.upper()} Pipeline | Scenario: {scenario_name}")
+    
+    # 1. Load & Intervene
+    df = load_and_standardize_sanitation()
+    df = apply_interventions(df, scenario)
+    
+    # 2. Layer 1
+    df = compute_load(df, pcfg)
+    
+    if model_type == 'nitrogen':
+        logging.info("Nitrogen pipeline complete.")
+        return
+
+    # 3. Layer 2 & 3 (FIO only)
+    # Load boreholes (Private & Gov)
+    # For simplicity, we process them together or separate. Let's do separate and concat.
+    results = []
+    for btype, path in [('private', config.PRIVATE_BOREHOLES_ENRICHED_PATH), 
+                        ('government', config.GOVERNMENT_BOREHOLES_ENRICHED_PATH)]:
+        if not path.exists():
+            logging.warning(f"Borehole file {path} not found. Skipping {btype}.")
+            continue
+            
+        bdf = pd.read_csv(path)
+        radius = scenario['radius_by_type'].get(btype, 35.0)
+        
+        bdf_linked = run_transport(df, bdf, pcfg, radius)
+        bdf_conc = compute_concentration(bdf_linked)
+        bdf_conc['borehole_type'] = btype
+        results.append(bdf_conc)
+        
+    if results:
+        final_df = pd.concat(results, ignore_index=True)
+        final_df.to_csv(pcfg.output_conc_path, index=False)
+        logging.info(f"Saved FIO concentrations to {pcfg.output_conc_path}")
+    else:
+        logging.warning("No borehole results generated.")
