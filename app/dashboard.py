@@ -386,7 +386,7 @@ def view_nitrogen_load(map_style, viz_type="Scatterplot"):
             df.sample(min(len(df), 20000)), # Sample for performance
             get_position=['long', 'lat'],
             get_fill_color='color',
-            get_radius=20,
+            get_radius=100,
             pickable=True
         )
     
@@ -469,7 +469,7 @@ def view_phosphorus_load(map_style, viz_type="Scatterplot"):
             df.sample(min(len(df), 20000)), # Sample for performance
             get_position=['long', 'lat'],
             get_fill_color='color',
-            get_radius=20,
+            get_radius=100,
             pickable=True
         )
     
