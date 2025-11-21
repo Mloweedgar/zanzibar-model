@@ -88,7 +88,7 @@ def get_color(val, min_val, max_val, palette='risk'):
 # --- Views ---
 
 def view_pathogen_risk(map_style, viz_type="Scatterplot"):
-    st.header("🦠 Pathogen Risk (E. coli)")
+    st.header("🦠 Pathogen Risk")
     
     df = load_data(config.FIO_CONCENTRATION_PATH)
     if df.empty:
@@ -99,21 +99,66 @@ def view_pathogen_risk(map_style, viz_type="Scatterplot"):
     btype = st.multiselect("Borehole Type", df['borehole_type'].unique(), default=df['borehole_type'].unique())
     df = df[df['borehole_type'].isin(btype)]
     
-    # Stats
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Boreholes", len(df))
-    c2.metric("Avg Concentration", f"{df['concentration_CFU_per_100mL'].mean():.1f}")
-    c3.metric("High Conc (>100 CFU)", len(df[df['concentration_CFU_per_100mL'] > 100]))
+    # Borehole Counts
+    c_total = len(df)
+    c_gov = len(df[df['borehole_type'] == 'government'])
+    c_priv = len(df[df['borehole_type'] == 'private'])
     
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Total Boreholes", f"{c_total:,}")
+    m2.metric("ZAWA (Gov)", f"{c_gov:,}")
+    m3.metric("Private", f"{c_priv:,}")
+    
+    st.markdown("---") # Separator
+    
+    # Stats: Risk Categories
     if 'risk_score' in df.columns:
-        c4.metric("Avg Risk Score", f"{df['risk_score'].mean():.1f}")
+        # Calculate categories
+        bins = [-1, 25, 50, 75, 90, 101]
+        labels = ['Safe', 'Moderate', 'High', 'Very High', 'Critical']
+        # Use a temporary column for counting
+        cats = pd.cut(df['risk_score'], bins=bins, labels=labels)
+        counts = cats.value_counts()
+        total = len(df)
         
-        # Use Risk Score for coloring if available (0-100 scale is cleaner)
-        # Use new 'risk' palette
+        cols = st.columns(5)
+        
+        # Safe (Blue)
+        c = counts.get('Safe', 0)
+        p = (c / total) * 100 if total > 0 else 0
+        cols[0].metric("🔵 Safe", f"{c:,}", f"{p:.1f}%")
+        
+        # Moderate (Green)
+        c = counts.get('Moderate', 0)
+        p = (c / total) * 100 if total > 0 else 0
+        cols[1].metric("🟢 Moderate", f"{c:,}", f"{p:.1f}%")
+        
+        # High (Yellow)
+        c = counts.get('High', 0)
+        p = (c / total) * 100 if total > 0 else 0
+        cols[2].metric("🟡 High", f"{c:,}", f"{p:.1f}%")
+        
+        # Very High (Orange)
+        c = counts.get('Very High', 0)
+        p = (c / total) * 100 if total > 0 else 0
+        cols[3].metric("🟠 V. High", f"{c:,}", f"{p:.1f}%")
+        
+        # Critical (Red)
+        c = counts.get('Critical', 0)
+        p = (c / total) * 100 if total > 0 else 0
+        cols[4].metric("🔴 Critical", f"{c:,}", f"{p:.1f}%")
+
+        # Use Risk Score for coloring
         df['color'] = df['risk_score'].apply(lambda x: get_color(x, 0, 100, palette='risk'))
         tooltip_text = "ID: {id}\nConc: {concentration_CFU_per_100mL:.1f} CFU\nRisk Score: {risk_score:.1f}"
+        
     else:
-        c4.metric("Risk Score", "N/A")
+        # Fallback for old data
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Boreholes", len(df))
+        c2.metric("Avg Concentration", f"{df['concentration_CFU_per_100mL'].mean():.1f}")
+        c3.metric("High Conc (>100)", len(df[df['concentration_CFU_per_100mL'] > 100]))
+        
         df['color'] = df['concentration_CFU_per_100mL'].apply(lambda x: get_color(np.log1p(x), 0, np.log1p(1000), palette='risk'))
         tooltip_text = "ID: {id}\nConc: {concentration_CFU_per_100mL:.1f} CFU"
 
@@ -123,8 +168,8 @@ def view_pathogen_risk(map_style, viz_type="Scatterplot"):
     else:
         df = df.sort_values('concentration_CFU_per_100mL', ascending=True)
 
-    # Fixed radius for equal visibility (50m = visible at regional zoom)
-    df['radius'] = 50
+    # Fixed radius for equal visibility (100m = matches model capture zone)
+    df['radius'] = 100
     
     if viz_type == "Heatmap":
         # Use Risk Score for weight if available
