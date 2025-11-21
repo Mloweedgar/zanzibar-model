@@ -334,7 +334,7 @@ def view_nitrogen_load(map_style, viz_type="Scatterplot"):
     q80 = df['nitrogen_load'].quantile(0.80)
     bins = [0, q20, q40, q60, q80, df['nitrogen_load'].max() + 1]
     
-    df['load_cat'] = pd.cut(df['nitrogen_load'], bins=bins, labels=labels)
+    df['load_cat'] = pd.cut(df['nitrogen_load'], bins=bins, labels=labels, duplicates='drop')
     cats = df['load_cat'].value_counts()
     total_points = len(df)
     
@@ -406,7 +406,7 @@ def view_phosphorus_load(map_style, viz_type="Scatterplot"):
     q80 = df['phosphorus_load'].quantile(0.80)
     bins = [0, q20, q40, q60, q80, df['phosphorus_load'].max() + 1]
     
-    df['load_cat'] = pd.cut(df['phosphorus_load'], bins=bins, labels=labels)
+    df['load_cat'] = pd.cut(df['phosphorus_load'], bins=bins, labels=labels, duplicates='drop')
     cats = df['load_cat'].value_counts()
     total_points = len(df)
     
