@@ -39,8 +39,8 @@ EARTH_RADIUS_M = 6371000
 # CRITICAL: Unit bug fixed in engine.py:234 (was *100, now /10)
 # Best params from 42-combo search: decay=0.05, EFIO=1e7
 # Note: These are "least bad" fits, not physically validated values
-EFIO_DEFAULT = 1e7          # CFU/person/day (Best fit: 1e7, down from 1e9)
-KS_PER_M_DEFAULT = 0.05     # Decay rate per meter (Best fit: 0.05, unchanged)
+EFIO_DEFAULT = 1.5e7        # CFU/person/day (Calibrated for Q=20k, R=100m)
+KS_PER_M_DEFAULT = 0.05     # Decay rate per meter
 
 # Nitrogen Constants
 PROTEIN_PER_CAPITA_DEFAULT = 0.060  # kg/person/day (approx 60g)
@@ -64,7 +64,7 @@ CONTAINMENT_EFFICIENCY_DEFAULT = {
 # Borehole Radii (meters)
 RADIUS_BY_TYPE_DEFAULT = {
     'private': 35.0,
-    'government': 100.0
+    'government': 100.0 # Increased to 100m to capture larger influence zone
 }
 
 # Column Mapping for Raw Data
@@ -82,28 +82,36 @@ SCENARIOS = {
         'label': 'Current situation (status quo)',
         'description': 'No interventions applied.',
         'pop_factor': 1.0,
-        'EFIO_override': EFIO_DEFAULT,
-        'ks_per_m': KS_PER_M_DEFAULT,
-        'radius_by_type': RADIUS_BY_TYPE_DEFAULT.copy(),
-        'phosphorus_detergent_consumption_override': PHOSPHORUS_DETERGENT_CONSUMPTION_G_PER_CAPITA,
-        'phosphorus_detergent_fraction_override': PHOSPHORUS_DETERGENT_PHOSPHORUS_FRACTION,
-        'od_reduction_percent': 0.0,
-        'infrastructure_upgrade_percent': 0.0,
-        'centralized_treatment_enabled': False,
+    'EFIO_override': EFIO_DEFAULT,
+    'ks_per_m': KS_PER_M_DEFAULT,
+    'radius_by_type': RADIUS_BY_TYPE_DEFAULT.copy(),
+    'flow_multiplier_by_type': {
+        'private': 1.0,
+        'government': 1.0
+    },
+    'phosphorus_detergent_consumption_override': PHOSPHORUS_DETERGENT_CONSUMPTION_G_PER_CAPITA,
+    'phosphorus_detergent_fraction_override': PHOSPHORUS_DETERGENT_PHOSPHORUS_FRACTION,
+    'od_reduction_percent': 0.0,
+    'infrastructure_upgrade_percent': 0.0,
+    'centralized_treatment_enabled': False,
         'fecal_sludge_treatment_percent': 0.0,
     },
     'crisis_2025_optimistic': {
         'label': 'Optimistic Future',
         'description': '50% reduction in OD, 50% pit upgrade.',
         'pop_factor': 1.0,
-        'EFIO_override': EFIO_DEFAULT,
-        'ks_per_m': KS_PER_M_DEFAULT,
-        'radius_by_type': RADIUS_BY_TYPE_DEFAULT.copy(),
-        'phosphorus_detergent_consumption_override': PHOSPHORUS_DETERGENT_CONSUMPTION_G_PER_CAPITA,
-        'phosphorus_detergent_fraction_override': PHOSPHORUS_DETERGENT_PHOSPHORUS_FRACTION,
-        'od_reduction_percent': 50.0,
-        'infrastructure_upgrade_percent': 50.0,
-        'centralized_treatment_enabled': True,
+    'EFIO_override': EFIO_DEFAULT,
+    'ks_per_m': KS_PER_M_DEFAULT,
+    'radius_by_type': RADIUS_BY_TYPE_DEFAULT.copy(),
+    'flow_multiplier_by_type': {
+        'private': 1.0,
+        'government': 1.0
+    },
+    'phosphorus_detergent_consumption_override': PHOSPHORUS_DETERGENT_CONSUMPTION_G_PER_CAPITA,
+    'phosphorus_detergent_fraction_override': PHOSPHORUS_DETERGENT_PHOSPHORUS_FRACTION,
+    'od_reduction_percent': 50.0,
+    'infrastructure_upgrade_percent': 50.0,
+    'centralized_treatment_enabled': True,
         'fecal_sludge_treatment_percent': 20.0,
     }
 }

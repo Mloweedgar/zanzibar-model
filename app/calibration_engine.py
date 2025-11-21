@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from sklearn.neighbors import BallTree
 import logging
+from scipy.stats import spearmanr, kendalltau, median_abs_deviation
 from app import config
 from app import calibration_utils
 
@@ -50,7 +51,10 @@ class CalibrationEngine:
         # Combine
         matched['model_conc'] = model_vals['concentration_CFU_per_100mL'].values
         matched['model_lat'] = model_vals['lat'].values
+        matched['model_lat'] = model_vals['lat'].values
         matched['model_long'] = model_vals['long'].values
+        if 'risk_score' in model_vals.columns:
+            matched['risk_score'] = model_vals['risk_score'].values
         
         return matched
 
@@ -77,18 +81,23 @@ class CalibrationEngine:
         bias = (log_pred - log_true).mean()
         
         # Robust metrics (less sensitive to outliers)
-        from scipy.stats import median_abs_deviation, spearmanr
         mad = median_abs_deviation(log_true - log_pred, nan_policy='omit')
         
-        # Spearman rank correlation (robust to outliers, preserves monotonic relationships)
+        # Rank correlations (raw + log space)
         spearman_rho, spearman_p = spearmanr(y_true, y_pred, nan_policy='omit')
+        spearman_log, _ = spearmanr(log_true, log_pred, nan_policy='omit')
+        kendall_rho, kendall_p = kendalltau(y_true, y_pred, nan_policy='omit')
         
         return {
             'n_samples': len(valid),
             'rmse_log': rmse,
             'bias_log': bias,
             'correlation': valid['fio_obs'].corr(valid['model_conc']),
+            'correlation_log': log_true.corr(log_pred),
             'mad': mad,
             'spearman_rho': spearman_rho,
-            'spearman_p': spearman_p
+            'spearman_log_rho': spearman_log,
+            'spearman_p': spearman_p,
+            'kendall_rho': kendall_rho,
+            'kendall_p': kendall_p
         }

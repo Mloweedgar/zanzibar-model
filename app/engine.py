@@ -170,7 +170,7 @@ def apply_interventions(df: pd.DataFrame, scenario: Dict[str, Any]) -> pd.DataFr
 
 # --- Step 2: Layer 1 Calculation ---
 
-def compute_load(df: pd.DataFrame, pcfg: PollutantConfig) -> pd.DataFrame:
+def compute_load(df: pd.DataFrame, pcfg: PollutantConfig, save_output: bool = True) -> pd.DataFrame:
     """Compute initial pollutant load per household."""
     df = df.copy()
     leakage = 1.0 - df['pathogen_containment_efficiency']
@@ -197,9 +197,10 @@ def compute_load(df: pd.DataFrame, pcfg: PollutantConfig) -> pd.DataFrame:
     elif pcfg.name == 'phosphorus':
         df = df.rename(columns={'load': 'phosphorus_load'})
     
-    # Save intermediate
-    df.to_csv(pcfg.output_load_path, index=False)
-    logging.info(f"Saved Layer 1 load to {pcfg.output_load_path}")
+    # Save intermediate (optional, skip during grid-search calibration to avoid I/O cost)
+    if save_output:
+        df.to_csv(pcfg.output_load_path, index=False)
+        logging.info(f"Saved Layer 1 load to {pcfg.output_load_path}")
     return df
 
 # --- Step 3: Layer 2 Transport (Vectorized) ---
@@ -249,17 +250,29 @@ def run_transport(toilets: pd.DataFrame, boreholes: pd.DataFrame, pcfg: Pollutan
 
 # --- Step 4: Layer 3 Concentration ---
 
-def compute_concentration(boreholes: pd.DataFrame) -> pd.DataFrame:
+def compute_concentration(boreholes: pd.DataFrame, flow_multiplier: float = 1.0) -> pd.DataFrame:
     """Convert aggregated load to concentration."""
     # Conc = Load / Flow, converted to CFU/100mL
     # Load is in CFU/day, Q is in L/day
     # Load/Q gives CFU/L
     # To convert CFU/L to CFU/100mL: divide by 10 (since 1L = 10×100mL)
     if 'Q_L_per_day' not in boreholes.columns:
-        logging.warning("Q_L_per_day missing, using default 1000L")
-        boreholes['Q_L_per_day'] = 1000.0
+        # Default to 20,000 L/day for government boreholes (realistic for community supply)
+        # This balances the high EFIO (1e9) to produce realistic concentration magnitudes.
+        logging.warning("Q_L_per_day missing, using default 20,000L")
+        boreholes['Q_L_per_day'] = 20000.0
         
-    boreholes['concentration_CFU_per_100mL'] = (boreholes['aggregated_load'] / boreholes['Q_L_per_day']) / 10.0
+    # Allow scenario-level flow scaling (e.g., when measured/assumed pumping rates are uncertain)
+    boreholes['concentration_CFU_per_100mL'] = (
+        boreholes['aggregated_load'] /
+        (boreholes['Q_L_per_day'] * max(flow_multiplier, 1e-6))
+    ) / 10.0
+
+    # Calculate Risk Score (0-100)
+    # Log-transform: 0 -> 0, 1 -> 20, 100 -> 60, 10000 -> 100
+    # Formula: 20 * log10(conc + 1), capped at 100
+    boreholes['risk_score'] = 20 * np.log10(boreholes['concentration_CFU_per_100mL'] + 1)
+    boreholes['risk_score'] = boreholes['risk_score'].clip(0, 100)
     return boreholes
 
 # --- Main Pipeline ---
@@ -293,6 +306,7 @@ def run_pipeline(model_type: str, scenario_name: str = 'crisis_2025_current', sc
     # Load boreholes (Private & Gov)
     # For simplicity, we process them together or separate. Let's do separate and concat.
     results = []
+    flow_multipliers = scenario.get('flow_multiplier_by_type', {'private': 1.0, 'government': 1.0})
     for btype, path in [('private', config.PRIVATE_BOREHOLES_ENRICHED_PATH), 
                         ('government', config.GOVERNMENT_BOREHOLES_ENRICHED_PATH)]:
         if not path.exists():
@@ -301,9 +315,10 @@ def run_pipeline(model_type: str, scenario_name: str = 'crisis_2025_current', sc
             
         bdf = pd.read_csv(path)
         radius = scenario['radius_by_type'].get(btype, 35.0)
+        flow_multiplier = flow_multipliers.get(btype, 1.0)
         
         bdf_linked = run_transport(df, bdf, pcfg, radius)
-        bdf_conc = compute_concentration(bdf_linked)
+        bdf_conc = compute_concentration(bdf_linked, flow_multiplier=flow_multiplier)
         bdf_conc['borehole_type'] = btype
         results.append(bdf_conc)
         

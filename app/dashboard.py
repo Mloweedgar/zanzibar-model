@@ -33,20 +33,57 @@ def load_data(path):
         return pd.DataFrame()
     return pd.read_csv(path, low_memory=False)
 
-def get_color(val, min_val, max_val, palette='red'):
+def get_color(val, min_val, max_val, palette='risk'):
     """Return color [r,g,b,a] based on value."""
-    # Simple linear interpolation
-    norm = np.clip((val - min_val) / (max_val - min_val + 1e-9), 0, 1)
-    if palette == 'red': # Green -> Yellow -> Red
-        r = int(255 * min(2 * norm, 1))
-        g = int(255 * min(2 * (1 - norm), 1))
-        b = 0
+    # Normalize
+    if max_val == min_val:
+        norm = 0.5
+    else:
+        norm = np.clip((val - min_val) / (max_val - min_val), 0, 1)
+    
+    if palette == 'risk':
+        # Multi-stop: Blue (0) -> Green (0.25) -> Yellow (0.5) -> Orange (0.75) -> Red (1.0)
+        # This gives more resolution than simple 2-stop interpolation
+        stops = {
+            0.00: [0, 0, 255],      # Blue (Safe)
+            0.25: [0, 255, 0],      # Green (Low)
+            0.50: [255, 255, 0],    # Yellow (Moderate)
+            0.75: [255, 165, 0],    # Orange (High)
+            1.00: [255, 0, 0]       # Red (Critical)
+        }
+        
+        # Find lower and upper stops
+        lower = 0.0
+        for s in sorted(stops.keys()):
+            if s <= norm:
+                lower = s
+            else:
+                break
+        
+        upper = 1.0
+        for s in sorted(stops.keys(), reverse=True):
+            if s >= norm:
+                upper = s
+            else:
+                break
+                
+        if lower == upper:
+            return stops[lower] + [200]
+            
+        # Interpolate
+        t = (norm - lower) / (upper - lower)
+        c1 = np.array(stops[lower])
+        c2 = np.array(stops[upper])
+        c = c1 + (c2 - c1) * t
+        return [int(c[0]), int(c[1]), int(c[2]), 200]
+
     elif palette == 'blue': # Light -> Dark Blue
         r, g = 0, 0
         b = int(50 + 205 * norm)
+        return [r, g, b, 200]
+        
     else:
-        r, g, b = 100, 100, 100
-    return [r, g, b, 200]
+        return [100, 100, 100, 200]
 
 # --- Views ---
 
@@ -63,22 +100,41 @@ def view_pathogen_risk(map_style, viz_type="Scatterplot"):
     df = df[df['borehole_type'].isin(btype)]
     
     # Stats
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4 = st.columns(4)
     c1.metric("Boreholes", len(df))
     c2.metric("Avg Concentration", f"{df['concentration_CFU_per_100mL'].mean():.1f}")
-    c3.metric("High Risk (>100)", len(df[df['concentration_CFU_per_100mL'] > 100]))
+    c3.metric("High Conc (>100 CFU)", len(df[df['concentration_CFU_per_100mL'] > 100]))
+    
+    if 'risk_score' in df.columns:
+        c4.metric("Avg Risk Score", f"{df['risk_score'].mean():.1f}")
+        
+        # Use Risk Score for coloring if available (0-100 scale is cleaner)
+        # Use new 'risk' palette
+        df['color'] = df['risk_score'].apply(lambda x: get_color(x, 0, 100, palette='risk'))
+        tooltip_text = "ID: {id}\nConc: {concentration_CFU_per_100mL:.1f} CFU\nRisk Score: {risk_score:.1f}"
+    else:
+        c4.metric("Risk Score", "N/A")
+        df['color'] = df['concentration_CFU_per_100mL'].apply(lambda x: get_color(np.log1p(x), 0, np.log1p(1000), palette='risk'))
+        tooltip_text = "ID: {id}\nConc: {concentration_CFU_per_100mL:.1f} CFU"
 
-    # Map
-    df['color'] = df['concentration_CFU_per_100mL'].apply(lambda x: get_color(np.log1p(x), 0, np.log1p(1000)))
-    df['radius'] = df['concentration_CFU_per_100mL'].apply(lambda x: 5 + np.clip(x/10, 0, 20))
+    # Sort by risk score so high risk renders on top (z-order)
+    if 'risk_score' in df.columns:
+        df = df.sort_values('risk_score', ascending=True)
+    else:
+        df = df.sort_values('concentration_CFU_per_100mL', ascending=True)
+
+    # Fixed radius for equal visibility (50m = visible at regional zoom)
+    df['radius'] = 50
     
     if viz_type == "Heatmap":
+        # Use Risk Score for weight if available
+        weight_col = 'risk_score' if 'risk_score' in df.columns else 'concentration_CFU_per_100mL'
         layer = pdk.Layer(
             "HeatmapLayer",
             df,
             get_position=['long', 'lat'],
-            get_weight='concentration_CFU_per_100mL',
-            radiusPixels=50,
+            get_weight=weight_col,
+            radiusPixels=30,
             intensity=1,
             threshold=0.1
         )
@@ -97,7 +153,7 @@ def view_pathogen_risk(map_style, viz_type="Scatterplot"):
         layers=[layer],
         initial_view_state=pdk.ViewState(latitude=-6.165, longitude=39.202, zoom=10),
         map_style=map_style,
-        tooltip={"text": "ID: {id}\nConc: {concentration_CFU_per_100mL} CFU"}
+        tooltip={"text": tooltip_text}
     ))
 
 def view_nitrogen_load(map_style, viz_type="Scatterplot"):
