@@ -402,13 +402,13 @@ def view_phosphorus_load(map_style, viz_type="Scatterplot"):
     
     cols = st.columns(5)
     
-    # Category metrics with color-coordinated emojis
+    # Category metrics with color-coordinated emojis (round circles only)
     cat_emojis = {
-        'Very Low': '💜',    # Light purple (using purple heart)
-        'Low': '🟣',         # Medium purple
-        'Moderate': '🔵',    # Blue-violet
-        'High': '🟤',        # Dark purple (brown as proxy)
-        'Very High': '⚫'    # Very dark
+        'Very Low': '⚪',    # White (lightest)
+        'Low': '🔵',         # Blue (light purple)
+        'Moderate': '🟣',    # Purple
+        'High': '🟤',        # Brown (dark purple)
+        'Very High': '⚫'    # Black (darkest)
     }
     
     for i, label in enumerate(labels):
