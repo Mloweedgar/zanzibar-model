@@ -326,34 +326,44 @@ def view_nitrogen_load(map_style, viz_type="Scatterplot"):
     total = df['nitrogen_load'].sum()/1000
     st.metric("Total Nitrogen Load", f"{total:.1f} tonnes/yr")
     
-    # Load Categories - Dynamic bins based on data percentiles
-    labels = ['Very Low', 'Low', 'Moderate', 'High', 'Very High']
-    q20 = df['nitrogen_load'].quantile(0.20)
-    q40 = df['nitrogen_load'].quantile(0.40)
-    q60 = df['nitrogen_load'].quantile(0.60)
-    q80 = df['nitrogen_load'].quantile(0.80)
-    bins = [0, q20, q40, q60, q80, df['nitrogen_load'].max() + 1]
+    # Load Categories - Simpler 3-category system that handles edge cases
+    # Based on data tertiles (33rd, 67th percentiles)
+    q33 = df['nitrogen_load'].quantile(0.33)
+    q67 = df['nitrogen_load'].quantile(0.67)
     
-    df['load_cat'] = pd.cut(df['nitrogen_load'], bins=bins, labels=labels, duplicates='drop')
-    cats = df['load_cat'].value_counts()
-    total_points = len(df)
-    
-    cols = st.columns(5)
-    
-    # Category metrics with color-coordinated emojis
-    cat_emojis = {
-        'Very Low': '🟢',    # Light green
-        'Low': '🟡',         # Yellow-green  
-        'Moderate': '🟠',    # Orange-green
-        'High': '🔴',        # Dark green
-        'Very High': '⚫'    # Very dark
-    }
-    
-    for i, label in enumerate(labels):
-        c = cats.get(label, 0)
+    # Handle edge case where all values are very similar
+    if q33 == q67:
+        df['load_cat'] = 'Moderate'
+        cats = df['load_cat'].value_counts()
+        total_points = len(df)
+        
+        cols = st.columns(3)
+        cols[0].metric("🟢 Low", "0", "0.0%")
+        cols[1].metric("🟡 Moderate", f"{total_points:,}", "100.0%")
+        cols[2].metric("🔴 High", "0", "0.0%")
+    else:
+        bins = [0, q33, q67, df['nitrogen_load'].max() + 1]
+        labels = ['Low', 'Moderate', 'High']
+        df['load_cat'] = pd.cut(df['nitrogen_load'], bins=bins, labels=labels)
+        cats = df['load_cat'].value_counts()
+        total_points = len(df)
+        
+        cols = st.columns(3)
+        
+        # Low (Green)
+        c = cats.get('Low', 0)
         p = (c / total_points) * 100 if total_points > 0 else 0
-        emoji = cat_emojis[label]
-        cols[i].metric(f"{emoji} {label}", f"{c:,}", f"{p:.1f}%")
+        cols[0].metric("🟢 Low", f"{c:,}", f"{p:.1f}%")
+        
+        # Moderate (Yellow)
+        c = cats.get('Moderate', 0)
+        p = (c / total_points) * 100 if total_points > 0 else 0
+        cols[1].metric("🟡 Moderate", f"{c:,}", f"{p:.1f}%")
+        
+        # High (Red)
+        c = cats.get('High', 0)
+        p = (c / total_points) * 100 if total_points > 0 else 0
+        cols[2].metric("🔴 High", f"{c:,}", f"{p:.1f}%")
     
     # Map - adjusted scale for better visual contrast (baseline mean ~13.5, scenario ~1.6)
     # Using max of 20 to show dramatic difference
@@ -398,34 +408,44 @@ def view_phosphorus_load(map_style, viz_type="Scatterplot"):
     total = df['phosphorus_load'].sum()/1000
     st.metric("Total Phosphorus Load", f"{total:.1f} tonnes/yr")
     
-    # Load Categories - Dynamic bins based on data percentiles
-    labels = ['Very Low', 'Low', 'Moderate', 'High', 'Very High']
-    q20 = df['phosphorus_load'].quantile(0.20)
-    q40 = df['phosphorus_load'].quantile(0.40)
-    q60 = df['phosphorus_load'].quantile(0.60)
-    q80 = df['phosphorus_load'].quantile(0.80)
-    bins = [0, q20, q40, q60, q80, df['phosphorus_load'].max() + 1]
+    # Load Categories - Simpler 3-category system that handles edge cases
+    # Based on data tertiles (33rd, 67th percentiles)
+    q33 = df['phosphorus_load'].quantile(0.33)
+    q67 = df['phosphorus_load'].quantile(0.67)
     
-    df['load_cat'] = pd.cut(df['phosphorus_load'], bins=bins, labels=labels, duplicates='drop')
-    cats = df['load_cat'].value_counts()
-    total_points = len(df)
-    
-    cols = st.columns(5)
-    
-    # Category metrics with color-coordinated emojis (round circles only)
-    cat_emojis = {
-        'Very Low': '⚪',    # White (lightest)
-        'Low': '🔵',         # Blue (light purple)
-        'Moderate': '🟣',    # Purple
-        'High': '🟤',        # Brown (dark purple)
-        'Very High': '⚫'    # Black (darkest)
-    }
-    
-    for i, label in enumerate(labels):
-        c = cats.get(label, 0)
+    # Handle edge case where all values are very similar
+    if q33 == q67:
+        df['load_cat'] = 'Moderate'
+        cats = df['load_cat'].value_counts()
+        total_points = len(df)
+        
+        cols = st.columns(3)
+        cols[0].metric("🔵 Low", "0", "0.0%")
+        cols[1].metric("🟣 Moderate", f"{total_points:,}", "100.0%")
+        cols[2].metric("🟤 High", "0", "0.0%")
+    else:
+        bins = [0, q33, q67, df['phosphorus_load'].max() + 1]
+        labels = ['Low', 'Moderate', 'High']
+        df['load_cat'] = pd.cut(df['phosphorus_load'], bins=bins, labels=labels)
+        cats = df['load_cat'].value_counts()
+        total_points = len(df)
+        
+        cols = st.columns(3)
+        
+        # Low (Blue)
+        c = cats.get('Low', 0)
         p = (c / total_points) * 100 if total_points > 0 else 0
-        emoji = cat_emojis[label]
-        cols[i].metric(f"{emoji} {label}", f"{c:,}", f"{p:.1f}%")
+        cols[0].metric("🔵 Low", f"{c:,}", f"{p:.1f}%")
+        
+        # Moderate (Purple)
+        c = cats.get('Moderate', 0)
+        p = (c / total_points) * 100 if total_points > 0 else 0
+        cols[1].metric("🟣 Moderate", f"{c:,}", f"{p:.1f}%")
+        
+        # High (Brown)
+        c = cats.get('High', 0)
+        p = (c / total_points) * 100 if total_points > 0 else 0
+        cols[2].metric("🟤 High", f"{c:,}", f"{p:.1f}%")
     
     # Map - adjusted scale for better visual contrast (baseline mean ~0.76, scenario ~0.08)
     # Using max of 1.0 to show dramatic difference
