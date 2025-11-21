@@ -326,9 +326,14 @@ def view_nitrogen_load(map_style, viz_type="Scatterplot"):
     total = df['nitrogen_load'].sum()/1000
     st.metric("Total Nitrogen Load", f"{total:.1f} tonnes/yr")
     
-    # Load Categories
-    bins = [0, 5, 10, 15, 20, 100]  # Aligned with color scale (0-20)
+    # Load Categories - Dynamic bins based on data percentiles
     labels = ['Very Low', 'Low', 'Moderate', 'High', 'Very High']
+    q20 = df['nitrogen_load'].quantile(0.20)
+    q40 = df['nitrogen_load'].quantile(0.40)
+    q60 = df['nitrogen_load'].quantile(0.60)
+    q80 = df['nitrogen_load'].quantile(0.80)
+    bins = [0, q20, q40, q60, q80, df['nitrogen_load'].max() + 1]
+    
     df['load_cat'] = pd.cut(df['nitrogen_load'], bins=bins, labels=labels)
     cats = df['load_cat'].value_counts()
     total_points = len(df)
@@ -393,9 +398,14 @@ def view_phosphorus_load(map_style, viz_type="Scatterplot"):
     total = df['phosphorus_load'].sum()/1000
     st.metric("Total Phosphorus Load", f"{total:.1f} tonnes/yr")
     
-    # Load Categories
-    bins = [0, 0.25, 0.50, 0.75, 1.0, 100]  # Aligned with color scale (0-1.0)
+    # Load Categories - Dynamic bins based on data percentiles
     labels = ['Very Low', 'Low', 'Moderate', 'High', 'Very High']
+    q20 = df['phosphorus_load'].quantile(0.20)
+    q40 = df['phosphorus_load'].quantile(0.40)
+    q60 = df['phosphorus_load'].quantile(0.60)
+    q80 = df['phosphorus_load'].quantile(0.80)
+    bins = [0, q20, q40, q60, q80, df['phosphorus_load'].max() + 1]
+    
     df['load_cat'] = pd.cut(df['phosphorus_load'], bins=bins, labels=labels)
     cats = df['load_cat'].value_counts()
     total_points = len(df)
