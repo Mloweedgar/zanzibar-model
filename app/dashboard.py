@@ -188,7 +188,7 @@ def view_pathogen_risk(map_style, viz_type="Scatterplot"):
         # Safe (Cyan)
         c = counts.get('Safe', 0)
         p = (c / total) * 100 if total > 0 else 0
-        cols[0].metric("🔷 Safe", f"{c:,}", f"{p:.1f}%")
+        cols[0].metric("🔵 Safe", f"{c:,}", f"{p:.1f}%")
         
         # Moderate (Green)
         c = counts.get('Moderate', 0)
