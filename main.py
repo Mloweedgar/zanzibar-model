@@ -5,12 +5,12 @@ import sys
 from app import engine
 
 def main():
-    parser = argparse.ArgumentParser(description="Zanzibar FIO/Nitrogen Model CLI")
+    parser = argparse.ArgumentParser(description="Zanzibar FIO/Nitrogen/Phosphorus Model CLI")
     subparsers = parser.add_subparsers(dest='command', help='Command to run')
     
     # Pipeline Command
     pipe_parser = subparsers.add_parser('pipeline', help='Run the model pipeline')
-    pipe_parser.add_argument('--model', choices=['fio', 'nitrogen'], required=True, help='Model type to run')
+    pipe_parser.add_argument('--model', choices=['fio', 'nitrogen', 'phosphorus'], required=True, help='Model type to run')
     pipe_parser.add_argument('--scenario', default='crisis_2025_current', help='Scenario name')
     
     # Dashboard Command

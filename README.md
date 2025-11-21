@@ -1,61 +1,49 @@
-## FIO Pathogen Model — Quick Start
+## Zanzibar Water Quality Model — Quick Start
+
+Supports three sibling pipelines that share the same sanitation inputs and scenario logic:
+- **FIO (pathogen)**: load + transport + concentration at boreholes  
+- **Nitrogen (N)**: annual load per sanitation point  
+- **Phosphorus (P)**: annual load per sanitation point (detergent-based)
 
 ### 1) Setup
 - Python 3.10+
-- Install deps:
-```bash
-pip install -r requirements.txt
-```
+- (Recommended) create a virtualenv
+- Install dependencies:
+  ```bash
+  pip install -r requirements.txt
+  ```
 
-### 2) Required inputs
-Place the following CSVs in `data/input/`:
-- `private_boreholes.csv` (raw private boreholes; used to derive Q and produce the enriched file)
-- `government_boreholes.csv` (must include `Q_L_per_day`)
-- `sanitation_type.csv` (household sanitation inventory)
-
-### 3) Preprocess boreholes (derive Q_L_per_day)
-Derive and save `Q_L_per_day` to enriched files used by the pipeline:
-```bash
-python main.py derive-private-q
-python main.py derive-government-q
-```
-This writes:
+### 2) Inputs (bundled in this repo)
+- `data/input/sanitation_type.csv`
 - `data/derived/private_boreholes_enriched.csv`
 - `data/derived/government_boreholes_enriched.csv`
+- These derived/enriched files are already included. If you replace the raw inputs, regenerate enriched versions with your own scripts (no CLI command is exposed in `main.py`).
 
-Optional (for inspection only):
+### 3) Run a pipeline
+Choose a model and scenario defined in `app/config.py` (`crisis_2025_current`, `crisis_2025_optimistic` by default):
 ```bash
-python main.py inspect-private-q
+# Pathogen (FIO)
+python main.py pipeline --model fio --scenario crisis_2025_current
+
+# Nitrogen
+python main.py pipeline --model nitrogen --scenario crisis_2025_current
+
+# Phosphorus
+python main.py pipeline --model phosphorus --scenario crisis_2025_current
 ```
-Writes unique value summaries to `data/output/`.
 
-### 4) Run the pipeline
-```bash
-python main.py pipeline --scenario crisis_2025_current
-```
-- `--scenario` accepts either a scenario name defined in `app/fio_config.py` or a JSON string with overrides.
+Key outputs (written to `data/output/`):
+- FIO: `fio_load_layer1.csv`, `fio_concentration_layer3.csv`
+- Nitrogen: `nitrogen_load_layer1.csv`
+- Phosphorus: `phosphorus_load_layer1.csv`
 
-Key outputs (written to `data/output/` unless noted):
-- Borehole concentrations: `fio_concentration_at_boreholes.csv`
-- Toilet markers (net loads): `dashboard_toilets_markers.csv`
-- Toilet heatmap data: `dashboard_toilets_heatmap.csv`
-- Link table (loads with distance decay): `net_surviving_pathogen_load_links.csv`
-- Enriched private boreholes (preprocess step): `data/derived/private_boreholes_enriched.csv`
-
-### 5) Launch the dashboard
+### 4) Launch the dashboard
 ```bash
 python main.py dashboard
 ```
-Opens a Streamlit app (defaults to port 8502). Use the sidebar to adjust interventions and rerun.
+Use the sidebar to select the view (Pathogen Risk, Nitrogen Load, Phosphorus Load, Toilet Inventory) and rerun scenarios.
 
-### Notes
-- The pipeline requires:
-  - `data/derived/private_boreholes_enriched.csv` (from step 3)
-  - `data/derived/government_boreholes_enriched.csv` (from step 3)
-- If inputs are missing, the pipeline will fail fast with a clear error message.
-
-### Troubleshooting
-- Missing Q for government boreholes: ensure the file has a positive `Q_L_per_day` column.
-- No links found: increase linking radius in the dashboard scenario, or verify coordinates.
-
-
+### 5) Troubleshooting
+- If pipelines fail on missing files, verify the enriched inputs in `data/derived/` exist. They are bundled; replace only if you have updated raw data and your own enrichment step.
+- Scenario names must exist in `app/config.py`.
+- For testing, install `pytest` via `pip install -r requirements.txt` and run `python -m pytest`.

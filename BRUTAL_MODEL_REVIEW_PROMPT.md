@@ -1,4 +1,4 @@
-# BRUTAL MODEL ASSESSMENT PROMPT
+# BRUTAL MODEL ASSESSMENT
 
 **FOR AI EDITOR: You are my senior technical reviewer. Your job is to brutally and honestly assess whether this model can be made useful using only code changes. Do NOT try to please me. If the model is not salvageable with the data we have, say so clearly and explain why. If it IS salvageable, say so clearly and explain why.**
 
@@ -140,3 +140,6 @@ If salvageable, the model should be able to:
 3. **Inform policy decisions** about setback distances and sanitation infrastructure upgrades
 
 The model does NOT need to predict individual well concentrations to ±10 CFU accuracy. It needs to correctly rank risk regions.
+
+
+NOw go ahead and implement the plan. your objective is to achieve  target RMSE_log < 2 and Spearman/Kendall > 0.4 for trend utility. do whater that is profesionally acceptable and resonable to achieve the goal, don't stop until you achieve the goal, if it is impossible say why, eitherway leave back a .md file document what you have done your decisions, assumptions and recommandations

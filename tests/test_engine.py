@@ -94,5 +94,23 @@ class TestEngine(unittest.TestCase):
         # Should capture all 4 toilets
         self.assertAlmostEqual(res['aggregated_load'].values[0], 400.0)
 
+    def test_compute_load_phosphorus(self):
+        pcfg = engine.PollutantConfig(
+            name='phosphorus',
+            output_load_path=Path('dummy.csv'),
+            phosphorus_detergent_consumption_g=10.0,
+            phosphorus_fraction=0.05
+        )
+        df = self.dummy_sanitation.copy()
+        df['pathogen_containment_efficiency'] = df['toilet_category_id'].map(config.CONTAINMENT_EFFICIENCY_DEFAULT)
+
+        res = engine.compute_load(df, pcfg)
+
+        # OD (id 4) -> Pop 10 * 10 g/day * 365 * 0.05 * leakage 1.0 /1000 = 1.825 kg/yr
+        self.assertAlmostEqual(res.loc[res['toilet_category_id'] == 4, 'phosphorus_load'].values[0], 1.825)
+
+        # Sewer (id 1) -> leakage 0.5 -> 0.9125 kg/yr
+        self.assertAlmostEqual(res.loc[res['toilet_category_id'] == 1, 'phosphorus_load'].values[0], 0.9125)
+
 if __name__ == '__main__':
     unittest.main()

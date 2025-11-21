@@ -1,4 +1,4 @@
-"""Central configuration for Zanzibar FIO/Nitrogen Model.
+"""Central configuration for Zanzibar FIO/Nitrogen/Phosphorus Model.
 
 This module consolidates all constants, file paths, and scenario definitions.
 """
@@ -30,6 +30,7 @@ SPATIAL_ADJ_CACHE_PREFIX = 'spatial_adj_{scenario}_{bh_type}_{radius_m}m.csv'
 FIO_LOAD_PATH = OUTPUT_DATA_DIR / 'fio_load_layer1.csv'
 FIO_CONCENTRATION_PATH = OUTPUT_DATA_DIR / 'fio_concentration_layer3.csv'
 NET_NITROGEN_LOAD_PATH = OUTPUT_DATA_DIR / 'nitrogen_load_layer1.csv'
+NET_PHOSPHORUS_LOAD_PATH = OUTPUT_DATA_DIR / 'phosphorus_load_layer1.csv'
 
 # --- Constants ---
 EARTH_RADIUS_M = 6371000
@@ -44,6 +45,10 @@ KS_PER_M_DEFAULT = 0.05     # Decay rate per meter (Best fit: 0.05, unchanged)
 # Nitrogen Constants
 PROTEIN_PER_CAPITA_DEFAULT = 0.060  # kg/person/day (approx 60g)
 PROTEIN_TO_NITROGEN_CONVERSION = 0.16  # 16% of protein is nitrogen
+
+# Phosphorus Constants (detergent-based)
+PHOSPHORUS_DETERGENT_CONSUMPTION_G_PER_CAPITA = 10.0  # g/person/day
+PHOSPHORUS_DETERGENT_PHOSPHORUS_FRACTION = 0.05       # fraction (5% P content)
 
 HOUSEHOLD_POPULATION_DEFAULT = 10
 
@@ -80,6 +85,8 @@ SCENARIOS = {
         'EFIO_override': EFIO_DEFAULT,
         'ks_per_m': KS_PER_M_DEFAULT,
         'radius_by_type': RADIUS_BY_TYPE_DEFAULT.copy(),
+        'phosphorus_detergent_consumption_override': PHOSPHORUS_DETERGENT_CONSUMPTION_G_PER_CAPITA,
+        'phosphorus_detergent_fraction_override': PHOSPHORUS_DETERGENT_PHOSPHORUS_FRACTION,
         'od_reduction_percent': 0.0,
         'infrastructure_upgrade_percent': 0.0,
         'centralized_treatment_enabled': False,
@@ -92,6 +99,8 @@ SCENARIOS = {
         'EFIO_override': EFIO_DEFAULT,
         'ks_per_m': KS_PER_M_DEFAULT,
         'radius_by_type': RADIUS_BY_TYPE_DEFAULT.copy(),
+        'phosphorus_detergent_consumption_override': PHOSPHORUS_DETERGENT_CONSUMPTION_G_PER_CAPITA,
+        'phosphorus_detergent_fraction_override': PHOSPHORUS_DETERGENT_PHOSPHORUS_FRACTION,
         'od_reduction_percent': 50.0,
         'infrastructure_upgrade_percent': 50.0,
         'centralized_treatment_enabled': True,

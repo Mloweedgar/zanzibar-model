@@ -94,16 +94,10 @@ python deliverables/create_figures.py
 # Install dependencies
 pip install pandas geopandas matplotlib folium streamlit scikit-learn seaborn
 
-# Preprocess data
-python main.py derive-private-q
-python main.py derive-government-q
-
-# Run baseline scenario
-python main.py pipeline --scenario calibrated_trend_baseline
-
-# Execute calibration
-python main.py calibrate
-python main.py trend
+# Run baseline scenarios (see app/config.py for available names)
+python main.py pipeline --model fio --scenario crisis_2025_current
+python main.py pipeline --model nitrogen --scenario crisis_2025_current
+python main.py pipeline --model phosphorus --scenario crisis_2025_current
 ```
 
 ## Intended Audience

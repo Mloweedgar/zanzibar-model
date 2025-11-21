@@ -3,7 +3,8 @@
 Combines:
 1. Pathogen Risk Map (FIO)
 2. Nitrogen Load Map
-3. Toilet Inventory Map
+3. Phosphorus Load Map
+4. Toilet Inventory Map
 """
 
 import streamlit as st
@@ -140,6 +141,47 @@ def view_nitrogen_load(map_style, viz_type="Scatterplot"):
         tooltip={"text": "Load: {nitrogen_load} kg/yr"}
     ))
 
+def view_phosphorus_load(map_style, viz_type="Scatterplot"):
+    st.header("🧼 Phosphorus Load")
+    
+    df = load_data(config.NET_PHOSPHORUS_LOAD_PATH)
+    if df.empty:
+        st.warning("No data found. Run the Phosphorus pipeline first.")
+        return
+        
+    # Stats
+    st.metric("Total Phosphorus Load", f"{df['phosphorus_load'].sum()/1000:.1f} tonnes/yr")
+    
+    # Map
+    df['color'] = df['phosphorus_load'].apply(lambda x: get_color(x, 0, 50, palette='blue'))
+    
+    if viz_type == "Heatmap":
+        layer = pdk.Layer(
+            "HeatmapLayer",
+            df,
+            get_position=['long', 'lat'],
+            get_weight='phosphorus_load',
+            radiusPixels=40,
+            intensity=1,
+            threshold=0.05
+        )
+    else:
+        layer = pdk.Layer(
+            "ScatterplotLayer",
+            df.sample(min(len(df), 20000)), # Sample for performance
+            get_position=['long', 'lat'],
+            get_fill_color='color',
+            get_radius=20,
+            pickable=True
+        )
+    
+    st.pydeck_chart(pdk.Deck(
+        layers=[layer],
+        initial_view_state=pdk.ViewState(latitude=-6.165, longitude=39.202, zoom=10),
+        map_style=map_style,
+        tooltip={"text": "Load: {phosphorus_load} kg/yr"}
+    ))
+
 def view_toilet_inventory(map_style):
     st.header("🚽 Toilet Inventory")
     
@@ -184,7 +226,7 @@ def view_toilet_inventory(map_style):
 
 def main():
     st.sidebar.title("Zanzibar Model")
-    view = st.sidebar.radio("View", ["Pathogen Risk", "Nitrogen Load", "Toilet Inventory", "Model vs Reality"])
+    view = st.sidebar.radio("View", ["Pathogen Risk", "Nitrogen Load", "Phosphorus Load", "Toilet Inventory", "Model vs Reality"])
     
     st.sidebar.markdown("---")
     st.sidebar.subheader("Run Scenario")
@@ -194,6 +236,8 @@ def main():
     # Infer model type from view
     if view == "Nitrogen Load":
         model_type = "nitrogen"
+    elif view == "Phosphorus Load":
+        model_type = "phosphorus"
     else:
         model_type = "fio"
     
@@ -231,6 +275,8 @@ def main():
         view_pathogen_risk(current_style, viz_type)
     elif view == "Nitrogen Load":
         view_nitrogen_load(current_style, viz_type)
+    elif view == "Phosphorus Load":
+        view_phosphorus_load(current_style, viz_type)
     elif view == "Toilet Inventory":
         view_toilet_inventory(current_style) # Keep inventory as scatter for categorical clarity
     elif view == "Model vs Reality":

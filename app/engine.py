@@ -24,7 +24,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 @dataclass
 class PollutantConfig:
     """Configuration for a specific pollutant type."""
-    name: Literal['fio', 'nitrogen']
+    name: Literal['fio', 'nitrogen', 'phosphorus']
     output_load_path: Path
     output_conc_path: Optional[Path] = None
     
@@ -35,6 +35,10 @@ class PollutantConfig:
     # Nitrogen specific
     protein_per_capita: float = 0.0
     protein_conversion: float = 0.0
+    
+    # Phosphorus specific (detergent-based)
+    phosphorus_detergent_consumption_g: float = 0.0
+    phosphorus_fraction: float = 0.0
 
 def _get_pollutant_config(model_type: str, scenario: Dict[str, Any]) -> PollutantConfig:
     if model_type == 'fio':
@@ -51,6 +55,19 @@ def _get_pollutant_config(model_type: str, scenario: Dict[str, Any]) -> Pollutan
             output_load_path=config.NET_NITROGEN_LOAD_PATH,
             protein_per_capita=scenario.get('protein_per_capita_override', config.PROTEIN_PER_CAPITA_DEFAULT),
             protein_conversion=scenario.get('protein_to_nitrogen_conversion_override', config.PROTEIN_TO_NITROGEN_CONVERSION)
+        )
+    elif model_type == 'phosphorus':
+        return PollutantConfig(
+            name='phosphorus',
+            output_load_path=config.NET_PHOSPHORUS_LOAD_PATH,
+            phosphorus_detergent_consumption_g=scenario.get(
+                'phosphorus_detergent_consumption_override',
+                config.PHOSPHORUS_DETERGENT_CONSUMPTION_G_PER_CAPITA
+            ),
+            phosphorus_fraction=scenario.get(
+                'phosphorus_detergent_fraction_override',
+                config.PHOSPHORUS_DETERGENT_PHOSPHORUS_FRACTION
+            )
         )
     else:
         raise ValueError(f"Unknown model type: {model_type}")
@@ -161,15 +178,24 @@ def compute_load(df: pd.DataFrame, pcfg: PollutantConfig) -> pd.DataFrame:
     if pcfg.name == 'fio':
         # Load = Pop * EFIO * Leakage
         df['load'] = df['household_population'] * pcfg.efio * leakage
-    else:
+    elif pcfg.name == 'nitrogen':
         # Nitrogen = Pop * Protein * Conversion * Leakage * 365
         df['load'] = (df['household_population'] * 
                       pcfg.protein_per_capita * 
                       pcfg.protein_conversion * 
                       leakage * 365)
+    else:
+        # Phosphorus = Pop * Detergent Use (g/day) * 365 * P fraction * Leakage, converted to kg/yr
+        df['load'] = (df['household_population'] *
+                      pcfg.phosphorus_detergent_consumption_g *
+                      365 *
+                      pcfg.phosphorus_fraction *
+                      leakage) / 1000.0
     
     if pcfg.name == 'nitrogen':
         df = df.rename(columns={'load': 'nitrogen_load'})
+    elif pcfg.name == 'phosphorus':
+        df = df.rename(columns={'load': 'phosphorus_load'})
     
     # Save intermediate
     df.to_csv(pcfg.output_load_path, index=False)
@@ -181,7 +207,7 @@ def compute_load(df: pd.DataFrame, pcfg: PollutantConfig) -> pd.DataFrame:
 def run_transport(toilets: pd.DataFrame, boreholes: pd.DataFrame, pcfg: PollutantConfig, radius_m: float) -> pd.DataFrame:
     """Link toilets to boreholes and compute decayed load using Vectorized BallTree."""
     if pcfg.name != 'fio':
-        logging.info("Skipping transport layer for Nitrogen (not required).")
+        logging.info("Skipping transport layer for non-FIO model (not required).")
         return pd.DataFrame()
 
     logging.info(f"Running Transport Layer (Radius: {radius_m}m, Decay: {pcfg.decay_rate})")
@@ -259,8 +285,8 @@ def run_pipeline(model_type: str, scenario_name: str = 'crisis_2025_current', sc
     # 2. Layer 1
     df = compute_load(df, pcfg)
     
-    if model_type == 'nitrogen':
-        logging.info("Nitrogen pipeline complete.")
+    if model_type != 'fio':
+        logging.info(f"{model_type.capitalize()} pipeline complete.")
         return
 
     # 3. Layer 2 & 3 (FIO only)
