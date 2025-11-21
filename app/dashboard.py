@@ -83,14 +83,13 @@ def get_color(val, min_val, max_val, palette='risk'):
         return [int(c[0]), int(c[1]), int(c[2]), 200]
 
     elif palette == 'nitrogen':
-        # Green gradient: Light green (safe) -> Dark green (high load)
-        # Multi-stop for dramatic effect
+        # Green → Yellow → Red gradient to match category emojis (🟢🟡🔴)
         stops = {
-            0.00: [230, 255, 230],  # Very light green (safe)
-            0.25: [144, 238, 144],  # Light green
-            0.50: [34, 139, 34],    # Forest green
-            0.75: [0, 100, 0],      # Dark green
-            1.00: [0, 50, 0]        # Very dark green (high load)
+            0.00: [100, 200, 100],  # Light green (Low)
+            0.33: [50, 200, 50],    # Medium green
+            0.50: [255, 255, 0],    # Yellow (Moderate)
+            0.67: [255, 200, 0],    # Orange-yellow
+            1.00: [255, 0, 0]       # Red (High)
         }
         
         sorted_stops = sorted(stops.keys())
