@@ -525,10 +525,34 @@ def main():
     st.sidebar.title("Zanzibar Model")
     view = st.sidebar.radio("View", ["Pathogen Risk", "Nitrogen Load", "Phosphorus Load", "Toilet Inventory", "Model vs Reality"])
     
+    # Scenario Selection
     st.sidebar.markdown("---")
-    st.sidebar.subheader("Run Scenario")
+    st.sidebar.markdown("### 📋 Select Scenario")
     
-    scenario_name = st.sidebar.selectbox("Scenario", list(config.SCENARIOS.keys()))
+    # Create mapping of display names to scenario keys
+    scenario_display_names = {
+        key: scenario.get('display_name', key) 
+        for key, scenario in config.SCENARIOS.items()
+    }
+    
+    # Reverse mapping for lookup
+    display_to_key = {v: k for k, v in scenario_display_names.items()}
+    
+    # Dropdown with display names
+    selected_display_name = st.sidebar.selectbox(
+        "Choose intervention scenario:",
+        options=list(scenario_display_names.values()),
+        index=0,  # Default to baseline
+        label_visibility="collapsed"
+    )
+    
+    # Get actual scenario key
+    scenario_name = display_to_key[selected_display_name]
+    
+    # Show scenario description in an info box
+    scenario_config = config.SCENARIOS[scenario_name]
+    if 'description' in scenario_config:
+        st.sidebar.info(f"**About this scenario:**\n\n{scenario_config['description']}")
     
     # Infer model type from view
     if view == "Nitrogen Load":
