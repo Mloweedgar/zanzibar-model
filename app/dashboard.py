@@ -365,9 +365,10 @@ def view_nitrogen_load(map_style, viz_type="Scatterplot"):
         p = (c / total_points) * 100 if total_points > 0 else 0
         cols[2].metric("🔴 High", f"{c:,}", f"{p:.1f}%")
     
-    # Map - adjusted scale for better visual contrast (baseline mean ~13.5, scenario ~1.6)
-    # Using max of 20 to show dramatic difference
-    df['color'] = df['nitrogen_load'].apply(lambda x: get_color(x, 0, 20, palette='nitrogen'))
+    # Map - Dynamic color scale based on data distribution
+    # Use 95th percentile as max to show variation in most of the data
+    scale_max = max(df['nitrogen_load'].quantile(0.95), 0.1)  # Avoid divide by zero
+    df['color'] = df['nitrogen_load'].apply(lambda x: get_color(x, 0, scale_max, palette='nitrogen'))
     
     if viz_type == "Heatmap":
         layer = pdk.Layer(
@@ -447,9 +448,10 @@ def view_phosphorus_load(map_style, viz_type="Scatterplot"):
         p = (c / total_points) * 100 if total_points > 0 else 0
         cols[2].metric("🟤 High", f"{c:,}", f"{p:.1f}%")
     
-    # Map - adjusted scale for better visual contrast (baseline mean ~0.76, scenario ~0.08)
-    # Using max of 1.0 to show dramatic difference
-    df['color'] = df['phosphorus_load'].apply(lambda x: get_color(x, 0, 1.0, palette='phosphorus'))
+    # Map - Dynamic color scale based on data distribution
+    # Use 95th percentile as max to show variation in most of the data
+    scale_max = max(df['phosphorus_load'].quantile(0.95), 0.01)  # Avoid divide by zero
+    df['color'] = df['phosphorus_load'].apply(lambda x: get_color(x, 0, scale_max, palette='phosphorus'))
     
     if viz_type == "Heatmap":
         layer = pdk.Layer(
