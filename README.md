@@ -1,49 +1,39 @@
-## Zanzibar Water Quality Model — Quick Start
+## Zanzibar Water Quality Model (FIO / Nitrogen / Phosphorus)
 
-Supports three sibling pipelines that share the same sanitation inputs and scenario logic:
-- **FIO (pathogen)**: load + transport + concentration at boreholes  
-- **Nitrogen (N)**: annual load per sanitation point  
-- **Phosphorus (P)**: annual load per sanitation point (detergent-based)
+### What it does
+- Pathogen (FIO) pipeline: sanitation load → distance-decay transport → borehole concentrations.
+- Nitrogen and phosphorus pipelines: annual loads per sanitation point (no transport).
+- Streamlit dashboard to view pathogen risk, N load, P load, and toilet inventory.
 
-### 1) Setup
-- Python 3.10+
-- (Recommended) create a virtualenv
-- Install dependencies:
-  ```bash
-  pip install -r requirements.txt
-  ```
-
-### 2) Inputs (bundled in this repo)
-- `data/input/sanitation_type.csv`
-- `data/derived/private_boreholes_enriched.csv`
-- `data/derived/government_boreholes_enriched.csv`
-- These derived/enriched files are already included. If you replace the raw inputs, regenerate enriched versions with your own scripts (no CLI command is exposed in `main.py`).
-
-### 3) Run a pipeline
-Choose a model and scenario defined in `app/config.py` (`crisis_2025_current`, `crisis_2025_optimistic` by default):
+### Setup
 ```bash
-# Pathogen (FIO)
-python main.py pipeline --model fio --scenario crisis_2025_current
-
-# Nitrogen
-python main.py pipeline --model nitrogen --scenario crisis_2025_current
-
-# Phosphorus
-python main.py pipeline --model phosphorus --scenario crisis_2025_current
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
-Key outputs (written to `data/output/`):
+### Run a pipeline (scenarios in app/config.py)
+```bash
+python main.py pipeline --model fio --scenario crisis_2025_current
+python main.py pipeline --model nitrogen --scenario crisis_2025_current
+python main.py pipeline --model phosphorus --scenario crisis_2025_current
+```
+Outputs go to `data/output/`:
 - FIO: `fio_load_layer1.csv`, `fio_concentration_layer3.csv`
 - Nitrogen: `nitrogen_load_layer1.csv`
 - Phosphorus: `phosphorus_load_layer1.csv`
 
-### 4) Launch the dashboard
+### Dashboard
 ```bash
 python main.py dashboard
 ```
-Use the sidebar to select the view (Pathogen Risk, Nitrogen Load, Phosphorus Load, Toilet Inventory) and rerun scenarios.
+Use the sidebar to switch views (Pathogen Risk, Nitrogen Load, Phosphorus Load, Toilet Inventory) and rerun scenarios.
 
-### 5) Troubleshooting
-- If pipelines fail on missing files, verify the enriched inputs in `data/derived/` exist. They are bundled; replace only if you have updated raw data and your own enrichment step.
-- Scenario names must exist in `app/config.py`.
-- For testing, install `pytest` via `pip install -r requirements.txt` and run `python -m pytest`.
+### Inputs
+- Derived/bundled inputs already in `data/derived/`: `private_boreholes_enriched.csv`, `government_boreholes_enriched.csv`, `sanitation_standardized.csv`.
+- If you swap raw inputs, regenerate these yourself (no derive CLI shipped).
+
+### Tests
+```bash
+python -m pytest
+```
