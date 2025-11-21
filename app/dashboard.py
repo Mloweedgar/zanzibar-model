@@ -551,8 +551,10 @@ def main():
     
     # Show scenario description in an info box
     scenario_config = config.SCENARIOS[scenario_name]
+    if 'display_name' in scenario_config:
+        st.sidebar.markdown(f"**Selected:** {scenario_config['display_name']}")
     if 'description' in scenario_config:
-        st.sidebar.info(f"**About this scenario:**\n\n{scenario_config['description']}")
+        st.sidebar.info(scenario_config['description'])
     
     # Infer model type from view
     if view == "Nitrogen Load":
