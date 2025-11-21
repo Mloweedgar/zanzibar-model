@@ -82,10 +82,66 @@ def get_color(val, min_val, max_val, palette='risk'):
         c = c1 + (c2 - c1) * t
         return [int(c[0]), int(c[1]), int(c[2]), 200]
 
-    elif palette == 'blue': # Light -> Dark Blue
-        r, g = 0, 0
-        b = int(50 + 205 * norm)
-        return [r, g, b, 200]
+    elif palette == 'nitrogen':
+        # Green gradient: Light green (safe) -> Dark green (high load)
+        # Multi-stop for dramatic effect
+        stops = {
+            0.00: [230, 255, 230],  # Very light green (safe)
+            0.25: [144, 238, 144],  # Light green
+            0.50: [34, 139, 34],    # Forest green
+            0.75: [0, 100, 0],      # Dark green
+            1.00: [0, 50, 0]        # Very dark green (high load)
+        }
+        
+        sorted_stops = sorted(stops.keys())
+        if norm >= sorted_stops[-1]:
+            return stops[sorted_stops[-1]] + [200]
+        if norm <= sorted_stops[0]:
+            return stops[sorted_stops[0]] + [200]
+        
+        lower = sorted_stops[0]
+        upper = sorted_stops[-1]
+        for i in range(len(sorted_stops) - 1):
+            if sorted_stops[i] <= norm < sorted_stops[i + 1]:
+                lower = sorted_stops[i]
+                upper = sorted_stops[i + 1]
+                break
+        
+        t = (norm - lower) / (upper - lower)
+        c1 = np.array(stops[lower])
+        c2 = np.array(stops[upper])
+        c = c1 + (c2 - c1) * t
+        return [int(c[0]), int(c[1]), int(c[2]), 200]
+    
+    elif palette == 'phosphorus':
+        # Purple gradient: Light purple (safe) -> Dark purple (high load)
+        stops = {
+            0.00: [230, 230, 250],  # Lavender (safe)
+            0.25: [186, 85, 211],   # Medium orchid
+            0.50: [138, 43, 226],   # Blue violet
+            0.75: [75, 0, 130],     # Indigo
+            1.00: [50, 0, 80]       # Very dark purple (high load)
+        }
+        
+        sorted_stops = sorted(stops.keys())
+        if norm >= sorted_stops[-1]:
+            return stops[sorted_stops[-1]] + [200]
+        if norm <= sorted_stops[0]:
+            return stops[sorted_stops[0]] + [200]
+        
+        lower = sorted_stops[0]
+        upper = sorted_stops[-1]
+        for i in range(len(sorted_stops) - 1):
+            if sorted_stops[i] <= norm < sorted_stops[i + 1]:
+                lower = sorted_stops[i]
+                upper = sorted_stops[i + 1]
+                break
+        
+        t = (norm - lower) / (upper - lower)
+        c1 = np.array(stops[lower])
+        c2 = np.array(stops[upper])
+        c = c1 + (c2 - c1) * t
+        return [int(c[0]), int(c[1]), int(c[2]), 200]
         
     else:
         return [100, 100, 100, 200]
@@ -267,10 +323,12 @@ def view_nitrogen_load(map_style, viz_type="Scatterplot"):
         return
         
     # Stats
-    st.metric("Total Nitrogen Load", f"{df['nitrogen_load'].sum()/1000:.1f} tonnes/yr")
+    total = df['nitrogen_load'].sum()/1000
+    st.metric("Total Nitrogen Load", f"{total:.1f} tonnes/yr")
     
-    # Map
-    df['color'] = df['nitrogen_load'].apply(lambda x: get_color(x, 0, 50, palette='blue'))
+    # Map - adjusted scale for better visual contrast (baseline mean ~13.5, scenario ~1.6)
+    # Using max of 20 to show dramatic difference
+    df['color'] = df['nitrogen_load'].apply(lambda x: get_color(x, 0, 20, palette='nitrogen'))
     
     if viz_type == "Heatmap":
         layer = pdk.Layer(
@@ -308,10 +366,12 @@ def view_phosphorus_load(map_style, viz_type="Scatterplot"):
         return
         
     # Stats
-    st.metric("Total Phosphorus Load", f"{df['phosphorus_load'].sum()/1000:.1f} tonnes/yr")
+    total = df['phosphorus_load'].sum()/1000
+    st.metric("Total Phosphorus Load", f"{total:.1f} tonnes/yr")
     
-    # Map
-    df['color'] = df['phosphorus_load'].apply(lambda x: get_color(x, 0, 50, palette='blue'))
+    # Map - adjusted scale for better visual contrast (baseline mean ~0.76, scenario ~0.08)
+    # Using max of 1.0 to show dramatic difference
+    df['color'] = df['phosphorus_load'].apply(lambda x: get_color(x, 0, 1.0, palette='phosphorus'))
     
     if viz_type == "Heatmap":
         layer = pdk.Layer(
