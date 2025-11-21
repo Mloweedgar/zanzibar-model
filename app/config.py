@@ -87,8 +87,8 @@ SCENARIOS = {
         'label': 'Baseline 2025 (Status Quo)',
         'description': 'Current situation with no interventions.',
         'pop_factor': 1.0,
-        'display_name': '📊 Baseline 2025 (Current State)',
-        'description': 'Current sanitation conditions with no additional interventions. Represents the status quo based on 2025 data.',
+        'display_name': '📊 Baseline 2025 (Status Quo)',
+        'description': 'Current sanitation conditions with no interventions. Represents the existing infrastructure: 14% sewer-connected septic, 49% septic tanks (mostly poorly constructed), 34% basic pit latrines, and 3% open defecation.',
         'pop_factor': 1.0,
         'EFIO_override': EFIO_DEFAULT,
         'ks_per_m': KS_PER_M_DEFAULT,
@@ -104,8 +104,8 @@ SCENARIOS = {
         'targeted_protection_enabled': False,
     },
     'scenario_1_targeted': {
-        'display_name': '🎯 Scenario 1: Targeted Protection',
-        'description': 'Focus interventions on the top 5% highest-risk areas. Upgrades toilets within 50m of high-risk boreholes to improved septic systems.',
+        'display_name': '🎯 Scenario 1: Targeted Borehole Protection and FSM Strengthening',
+        'description': 'Focused intervention for rapid public health benefits. Protects top 5% highest-risk boreholes (~950) with mandatory 35m protection zones, rehabilitates Kizimbani and Kibele treatment plants, and implements Community-Led Total Sanitation (CLTS) campaigns in contamination hotspots.',
         'pop_factor': 1.0,
         'EFIO_override': EFIO_DEFAULT,
         'ks_per_m': KS_PER_M_DEFAULT,
@@ -121,8 +121,8 @@ SCENARIOS = {
         'centralized_treatment_enabled': False
     },
     'scenario_2_cwis': {
-        'display_name': '🏙️ Scenario 2: City-Wide Improvements (CWIS)',
-        'description': 'Comprehensive city-wide sanitation improvements: 95% reduction in open defecation, 90% pit latrine upgrades, and 90% fecal sludge management coverage.',
+        'display_name': '🏙️ Scenario 2: Community-Wide Inclusive Sanitation (CWIS) Expansion',
+        'description': 'Holistic district-wide strategy for sustainable contamination prevention. Large-scale program to convert pit latrines to water-tight septic tanks, construct decentralized treatment facilities (FSTPs and WSPs) in key growth corridors, and establish regulated emptying services with digital tracking.',
         'pop_factor': 1.0,
         'EFIO_override': EFIO_DEFAULT,
         'ks_per_m': KS_PER_M_DEFAULT,
@@ -138,8 +138,8 @@ SCENARIOS = {
         'stone_town_sewer_enabled': False
     },
     'scenario_3_stone_town': {
-        'display_name': '🏛️ Scenario 3: Stone Town Sewer System',
-        'description': 'Install a centralized sewer network in historic Stone Town with a modern wastewater treatment plant (90% efficiency), plus city-wide improvements.',
+        'display_name': '🏛️ Scenario 3: Centralized WWTP for Stone Town with CWIS',
+        'description': 'Transformative long-term investment to eliminate Stone Town marine pollution. Constructs centralized Waste Stabilization Pond (WSP) system to treat wastewater from 27 sea outfalls, installs interceptor sewers and pump stations, and implements CWIS for unsewered areas within the municipality.',
         'pop_factor': 1.0,
         'EFIO_override': EFIO_DEFAULT,
         'ks_per_m': KS_PER_M_DEFAULT,
