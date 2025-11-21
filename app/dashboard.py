@@ -322,9 +322,33 @@ def view_nitrogen_load(map_style, viz_type="Scatterplot"):
         st.warning("No data found. Run the Nitrogen pipeline first.")
         return
         
-    # Stats
+    # Stats - Total Load
     total = df['nitrogen_load'].sum()/1000
     st.metric("Total Nitrogen Load", f"{total:.1f} tonnes/yr")
+    
+    # Load Categories
+    bins = [0, 5, 10, 15, 20, 100]  # Aligned with color scale (0-20)
+    labels = ['Very Low', 'Low', 'Moderate', 'High', 'Very High']
+    df['load_cat'] = pd.cut(df['nitrogen_load'], bins=bins, labels=labels)
+    cats = df['load_cat'].value_counts()
+    total_points = len(df)
+    
+    cols = st.columns(5)
+    
+    # Category metrics with color-coordinated emojis
+    cat_emojis = {
+        'Very Low': '🟢',    # Light green
+        'Low': '🟡',         # Yellow-green  
+        'Moderate': '🟠',    # Orange-green
+        'High': '🔴',        # Dark green
+        'Very High': '⚫'    # Very dark
+    }
+    
+    for i, label in enumerate(labels):
+        c = cats.get(label, 0)
+        p = (c / total_points) * 100 if total_points > 0 else 0
+        emoji = cat_emojis[label]
+        cols[i].metric(f"{emoji} {label}", f"{c:,}", f"{p:.1f}%")
     
     # Map - adjusted scale for better visual contrast (baseline mean ~13.5, scenario ~1.6)
     # Using max of 20 to show dramatic difference
@@ -365,9 +389,33 @@ def view_phosphorus_load(map_style, viz_type="Scatterplot"):
         st.warning("No data found. Run the Phosphorus pipeline first.")
         return
         
-    # Stats
+    # Stats - Total Load
     total = df['phosphorus_load'].sum()/1000
     st.metric("Total Phosphorus Load", f"{total:.1f} tonnes/yr")
+    
+    # Load Categories
+    bins = [0, 0.25, 0.50, 0.75, 1.0, 100]  # Aligned with color scale (0-1.0)
+    labels = ['Very Low', 'Low', 'Moderate', 'High', 'Very High']
+    df['load_cat'] = pd.cut(df['phosphorus_load'], bins=bins, labels=labels)
+    cats = df['load_cat'].value_counts()
+    total_points = len(df)
+    
+    cols = st.columns(5)
+    
+    # Category metrics with color-coordinated emojis
+    cat_emojis = {
+        'Very Low': '💜',    # Light purple (using purple heart)
+        'Low': '🟣',         # Medium purple
+        'Moderate': '🔵',    # Blue-violet
+        'High': '🟤',        # Dark purple (brown as proxy)
+        'Very High': '⚫'    # Very dark
+    }
+    
+    for i, label in enumerate(labels):
+        c = cats.get(label, 0)
+        p = (c / total_points) * 100 if total_points > 0 else 0
+        emoji = cat_emojis[label]
+        cols[i].metric(f"{emoji} {label}", f"{c:,}", f"{p:.1f}%")
     
     # Map - adjusted scale for better visual contrast (baseline mean ~0.76, scenario ~0.08)
     # Using max of 1.0 to show dramatic difference
