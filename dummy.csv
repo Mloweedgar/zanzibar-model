@@ -1,5 +1,0 @@
-id,lat,long,toilet_category_id,household_population,pathogen_containment_efficiency,phosphorus_load
-1,0.0,0.0,1,10,0.5,0.9125
-2,0.0,0.0,2,10,0.1,1.6425
-3,0.0,0.0,3,10,0.3,1.2775
-4,0.0,0.0,4,10,0.0,1.825
