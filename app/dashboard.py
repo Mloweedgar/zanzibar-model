@@ -113,13 +113,13 @@ def get_color(val, min_val, max_val, palette='risk'):
         return [int(c[0]), int(c[1]), int(c[2]), 200]
     
     elif palette == 'phosphorus':
-        # Purple gradient: Light purple (safe) -> Dark purple (high load)
+        # Blue → Purple → Brown gradient to match category emojis (🔵🟣🟤)
         stops = {
-            0.00: [230, 230, 250],  # Lavender (safe)
-            0.25: [186, 85, 211],   # Medium orchid
-            0.50: [138, 43, 226],   # Blue violet
-            0.75: [75, 0, 130],     # Indigo
-            1.00: [50, 0, 80]       # Very dark purple (high load)
+            0.00: [100, 150, 255],  # Light blue (Low)
+            0.33: [50, 100, 255],   # Medium blue
+            0.50: [150, 50, 200],   # Purple (Moderate)
+            0.67: [120, 80, 120],   # Purple-brown
+            1.00: [139, 69, 19]     # Brown (High)
         }
         
         sorted_stops = sorted(stops.keys())
