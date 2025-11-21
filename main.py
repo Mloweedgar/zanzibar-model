@@ -11,7 +11,7 @@ def main():
     # Pipeline Command
     pipe_parser = subparsers.add_parser('pipeline', help='Run the model pipeline')
     pipe_parser.add_argument('--model', choices=['fio', 'nitrogen', 'phosphorus'], required=True, help='Model type to run')
-    pipe_parser.add_argument('--scenario', default='crisis_2025_current', help='Scenario name')
+    pipe_parser.add_argument('--scenario', default='baseline_2025', help='Scenario name')
     
     # Dashboard Command
     dash_parser = subparsers.add_parser('dashboard', help='Launch the dashboard')

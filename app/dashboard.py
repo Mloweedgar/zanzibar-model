@@ -44,32 +44,37 @@ def get_color(val, min_val, max_val, palette='risk'):
     if palette == 'risk':
         # Multi-stop: Blue (0) -> Green (0.25) -> Yellow (0.5) -> Orange (0.75) -> Red (1.0)
         # This gives more resolution than simple 2-stop interpolation
+        # Dramatic color palette: Cyan (Safe) -> Lime (Low) -> Yellow (Moderate) -> Orange (High) -> Deep Red (Critical)
         stops = {
-            0.00: [0, 0, 255],      # Blue (Safe)
-            0.25: [0, 255, 0],      # Green (Low)
+            0.00: [0, 255, 255],    # Bright Cyan (Safe) - eye-catching safe zones
+            0.25: [0, 255, 0],      # Lime Green (Low)
             0.50: [255, 255, 0],    # Yellow (Moderate)
-            0.75: [255, 165, 0],    # Orange (High)
-            1.00: [255, 0, 0]       # Red (Critical)
+            0.60: [255, 165, 0],    # Orange (High) - standard orange
+            0.90: [255, 69, 0],     # Orange-Red (Very High) - subtle transition
+            1.00: [200, 0, 0]       # Deep Red (Critical) - darker red for maximum
         }
         
         # Find lower and upper stops
-        lower = 0.0
-        for s in sorted(stops.keys()):
-            if s <= norm:
-                lower = s
-            else:
-                break
+        sorted_stops = sorted(stops.keys())
         
-        upper = 1.0
-        for s in sorted(stops.keys(), reverse=True):
-            if s >= norm:
-                upper = s
-            else:
+        # If norm is at or beyond max, use max color
+        if norm >= sorted_stops[-1]:
+            return stops[sorted_stops[-1]] + [200]
+        
+        # If norm is at or below min, use min color
+        if norm <= sorted_stops[0]:
+            return stops[sorted_stops[0]] + [200]
+        
+        # Find the two stops to interpolate between
+        lower = sorted_stops[0]
+        upper = sorted_stops[-1]
+        
+        for i in range(len(sorted_stops) - 1):
+            if sorted_stops[i] <= norm < sorted_stops[i + 1]:
+                lower = sorted_stops[i]
+                upper = sorted_stops[i + 1]
                 break
                 
-        if lower == upper:
-            return stops[lower] + [200]
-            
         # Interpolate
         t = (norm - lower) / (upper - lower)
         c1 = np.array(stops[lower])
@@ -114,7 +119,8 @@ def view_pathogen_risk(map_style, viz_type="Scatterplot"):
     # Stats: Risk Categories
     if 'risk_score' in df.columns:
         # Calculate categories
-        bins = [-1, 25, 50, 75, 90, 101]
+        # Matched to new palette: Blue(0-25), Green(25-50), Yellow(50-60), Orange(60-90), Red(90+)
+        bins = [-1, 25, 50, 60, 90, 101]
         labels = ['Safe', 'Moderate', 'High', 'Very High', 'Critical']
         # Use a temporary column for counting
         cats = pd.cut(df['risk_score'], bins=bins, labels=labels)
@@ -123,10 +129,10 @@ def view_pathogen_risk(map_style, viz_type="Scatterplot"):
         
         cols = st.columns(5)
         
-        # Safe (Blue)
+        # Safe (Cyan)
         c = counts.get('Safe', 0)
         p = (c / total) * 100 if total > 0 else 0
-        cols[0].metric("🔵 Safe", f"{c:,}", f"{p:.1f}%")
+        cols[0].metric("🔷 Safe", f"{c:,}", f"{p:.1f}%")
         
         # Moderate (Green)
         c = counts.get('Moderate', 0)
@@ -183,6 +189,57 @@ def view_pathogen_risk(map_style, viz_type="Scatterplot"):
             intensity=1,
             threshold=0.1
         )
+    elif viz_type == "Risk Reduction (Impact)":
+        # Load Baseline
+        baseline_path = config.OUTPUT_DATA_DIR / 'baseline_risk.csv'
+        if not baseline_path.exists():
+            st.error("Baseline file not found. Run 'baseline_2025' first.")
+            return
+            
+        base_df = pd.read_csv(baseline_path)
+        
+        # Merge on FID
+        merged = df.merge(base_df[['fid', 'risk_score']], on='fid', suffixes=('', '_base'))
+        
+        # Calculate Improvement (Positive = Good)
+        merged['improvement'] = merged['risk_score_base'] - merged['risk_score']
+        
+        # Filter for positive improvement
+        improved = merged[merged['improvement'] > 0.1].copy()
+        
+        if improved.empty:
+            st.warning("No risk reduction detected in this scenario.")
+            return
+            
+        st.metric("Total Risk Reduced", f"{improved['improvement'].sum():.1f} points")
+        
+        # Color: Green intensity based on improvement
+        # 0 -> Dark Green, 20+ -> Bright Neon Green
+        improved['color'] = improved['improvement'].apply(lambda x: [0, 255, 0, int(np.clip(x*10 + 50, 100, 255))])
+        
+        # Radius: Bigger improvement = Bigger bubble
+        improved['radius'] = improved['improvement'].apply(lambda x: np.clip(x * 10, 50, 300))
+        
+        layer = pdk.Layer(
+            "ScatterplotLayer",
+            improved,
+            get_position=['long', 'lat'],
+            get_fill_color='color',
+            get_radius='radius',
+            pickable=True,
+            auto_highlight=True
+        )
+        tooltip_text = "ID: {id}\nImprovement: +{improvement:.1f} pts"
+        
+        # Overwrite tooltip for this view
+        st.pydeck_chart(pdk.Deck(
+            layers=[layer],
+            initial_view_state=pdk.ViewState(latitude=-6.165, longitude=39.202, zoom=10),
+            map_style=map_style,
+            tooltip={"text": tooltip_text}
+        ))
+        return
+
     else:
         layer = pdk.Layer(
             "ScatterplotLayer",
@@ -342,11 +399,78 @@ def main():
     else:
         model_type = "fio"
     
-    if st.sidebar.button(f"Run {model_type.upper()} Pipeline"):
-        with st.spinner(f"Running {model_type}..."):
-            engine.run_pipeline(model_type, scenario_name)
+    # Get selected scenario config
+    selected_scenario = config.SCENARIOS[scenario_name]
+    
+    # Interactive Parameter Controls (prefilled from scenario)
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🎛️ Intervention Parameters")
+    st.sidebar.caption("Adjust these to explore custom scenarios")
+    
+    # OD Reduction
+    od_reduction = st.sidebar.slider(
+        "Open Defecation Reduction (%)",
+        min_value=0,
+        max_value=100,
+        value=int(selected_scenario.get('od_reduction_percent', 0)),
+        step=5,
+        help="% of OD households upgraded to improved sanitation"
+    )
+    
+    # Infrastructure Upgrade
+    infra_upgrade = st.sidebar.slider(
+        "Pit → Septic Upgrade (%)",
+        min_value=0,
+        max_value=100,
+        value=int(selected_scenario.get('infrastructure_upgrade_percent', 0)),
+        step=5,
+        help="% of pit latrines upgraded to septic systems"
+    )
+    
+    # FSM Treatment
+    fsm_treatment = st.sidebar.slider(
+        "FSM Treatment Coverage (%)",
+        min_value=0,
+        max_value=100,
+        value=int(selected_scenario.get('fecal_sludge_treatment_percent', 0)),
+        step=5,
+        help="% of septic systems with regulated emptying/treatment"
+    )
+    
+    # Stone Town WWTP Toggle
+    stone_town_sewer = st.sidebar.checkbox(
+        "Enable Stone Town WWTP",
+        value=selected_scenario.get('stone_town_sewer_enabled', False),
+        help="Connect Stone Town to centralized wastewater treatment"
+    )
+    
+    # Build scenario override with slider values
+    scenario_override = {
+        'od_reduction_percent': float(od_reduction),
+        'infrastructure_upgrade_percent': float(infra_upgrade),
+        'fecal_sludge_treatment_percent': float(fsm_treatment),
+        'stone_town_sewer_enabled': stone_town_sewer,
+        'centralized_treatment_enabled': stone_town_sewer or selected_scenario.get('centralized_treatment_enabled', False)
+    }
+    
+    # Auto-run when scenario changes (but not sliders)
+    if 'last_scenario' not in st.session_state:
+        st.session_state.last_scenario = scenario_name
+        
+    if st.session_state.last_scenario != scenario_name:
+        with st.spinner(f"Running {scenario_name}..."):
+            engine.run_pipeline(model_type, scenario_name, scenario_override)
+        st.session_state.last_scenario = scenario_name
+        st.success(f"✅ {scenario_name} complete!")
+        st.experimental_rerun()
+    
+    # Manual run button (with custom slider values)
+    if st.sidebar.button(f"▶️ Run with Custom Parameters"):
+        with st.spinner(f"Running custom scenario..."):
+            engine.run_pipeline(model_type, scenario_name, scenario_override)
         st.success("Done!")
         st.experimental_rerun()
+
 
     with st.sidebar.expander("Settings"):
         st.markdown("**Map Style**")

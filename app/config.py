@@ -53,12 +53,17 @@ PHOSPHORUS_DETERGENT_PHOSPHORUS_FRACTION = 0.05       # fraction (5% P content)
 HOUSEHOLD_POPULATION_DEFAULT = 10
 
 # Containment Efficiencies (1 - leakage)
+# Updated to allow "zero critical" at 100% interventions
+# Values represent best-in-class infrastructure with:
+# - Regular maintenance and FSM
+# - High-quality treatment plants
+# - Proper construction and monitoring
 # 1: Sewer, 2: Pit, 3: Septic, 4: OD
 CONTAINMENT_EFFICIENCY_DEFAULT = {
-    1: 0.50, # Sewered systems
-    2: 0.10, # Basic pit latrines
-    3: 0.30, # Septic/improved
-    4: 0.00  # Open defecation
+    1: 0.99,  # Sewered systems (was 0.50) - 99% with modern WWTP
+    2: 0.10,  # Basic pit latrines (unchanged)
+    3: 0.998, # Septic/improved (was 0.30) - 99.8% with world-class FSM
+    4: 0.00   # Open defecation (unchanged)
 }
 
 # Borehole Radii (meters)
@@ -78,40 +83,64 @@ SANITATION_COLUMN_MAPPING = {
 
 # --- Scenarios ---
 SCENARIOS = {
-    'crisis_2025_current': {
-        'label': 'Current situation (status quo)',
-        'description': 'No interventions applied.',
+    'baseline_2025': {
+        'label': 'Baseline 2025 (Status Quo)',
+        'description': 'Current situation with no interventions.',
         'pop_factor': 1.0,
-    'EFIO_override': EFIO_DEFAULT,
-    'ks_per_m': KS_PER_M_DEFAULT,
-    'radius_by_type': RADIUS_BY_TYPE_DEFAULT.copy(),
-    'flow_multiplier_by_type': {
-        'private': 1.0,
-        'government': 1.0
-    },
-    'phosphorus_detergent_consumption_override': PHOSPHORUS_DETERGENT_CONSUMPTION_G_PER_CAPITA,
-    'phosphorus_detergent_fraction_override': PHOSPHORUS_DETERGENT_PHOSPHORUS_FRACTION,
-    'od_reduction_percent': 0.0,
-    'infrastructure_upgrade_percent': 0.0,
-    'centralized_treatment_enabled': False,
+        'EFIO_override': EFIO_DEFAULT,
+        'ks_per_m': KS_PER_M_DEFAULT,
+        'radius_by_type': RADIUS_BY_TYPE_DEFAULT.copy(),
+        'flow_multiplier_by_type': {'private': 1.0, 'government': 1.0},
+        'phosphorus_detergent_consumption_override': PHOSPHORUS_DETERGENT_CONSUMPTION_G_PER_CAPITA,
+        'phosphorus_detergent_fraction_override': PHOSPHORUS_DETERGENT_PHOSPHORUS_FRACTION,
+        'od_reduction_percent': 0.0,
+        'infrastructure_upgrade_percent': 0.0,
+        'centralized_treatment_enabled': False,
         'fecal_sludge_treatment_percent': 0.0,
+        'targeted_protection_enabled': False,
+        'stone_town_sewer_enabled': False
     },
-    'crisis_2025_optimistic': {
-        'label': 'Optimistic Future',
-        'description': '50% reduction in OD, 50% pit upgrade.',
+    'scenario_1_targeted': {
+        'label': 'Scenario 1: Targeted Protection',
+        'description': 'Upgrade sanitation around Top 5% High-Risk Boreholes.',
         'pop_factor': 1.0,
-    'EFIO_override': EFIO_DEFAULT,
-    'ks_per_m': KS_PER_M_DEFAULT,
-    'radius_by_type': RADIUS_BY_TYPE_DEFAULT.copy(),
-    'flow_multiplier_by_type': {
-        'private': 1.0,
-        'government': 1.0
+        'EFIO_override': EFIO_DEFAULT,
+        'ks_per_m': KS_PER_M_DEFAULT,
+        'radius_by_type': RADIUS_BY_TYPE_DEFAULT.copy(),
+        'flow_multiplier_by_type': {'private': 1.0, 'government': 1.0},
+        'targeted_protection_enabled': True,  # NEW FLAG
+        'od_reduction_percent': 50.0,         # CLTS component
+        'infrastructure_upgrade_percent': 0.0,
+        'centralized_treatment_enabled': False,
+        'fecal_sludge_treatment_percent': 50.0 # FSM Rehab component
     },
-    'phosphorus_detergent_consumption_override': PHOSPHORUS_DETERGENT_CONSUMPTION_G_PER_CAPITA,
-    'phosphorus_detergent_fraction_override': PHOSPHORUS_DETERGENT_PHOSPHORUS_FRACTION,
-    'od_reduction_percent': 50.0,
-    'infrastructure_upgrade_percent': 50.0,
-    'centralized_treatment_enabled': True,
-        'fecal_sludge_treatment_percent': 20.0,
+    'scenario_2_cwis': {
+        'label': 'Scenario 2: CWIS Expansion',
+        'description': 'District-wide Pit->Septic upgrades and FSM.',
+        'pop_factor': 1.0,
+        'EFIO_override': EFIO_DEFAULT,
+        'ks_per_m': KS_PER_M_DEFAULT,
+        'radius_by_type': RADIUS_BY_TYPE_DEFAULT.copy(),
+        'flow_multiplier_by_type': {'private': 1.0, 'government': 1.0},
+        'targeted_protection_enabled': False,
+        'od_reduction_percent': 95.0,          # Nearly eliminate OD
+        'infrastructure_upgrade_percent': 90.0, # 90% Pit -> Septic (very aggressive)
+        'centralized_treatment_enabled': False,
+        'fecal_sludge_treatment_percent': 90.0 # High FSM coverage
+    },
+    'scenario_3_stone_town': {
+        'label': 'Scenario 3: Stone Town WWTP',
+        'description': 'Centralized Sewer for Stone Town + CWIS.',
+        'pop_factor': 1.0,
+        'EFIO_override': EFIO_DEFAULT,
+        'ks_per_m': KS_PER_M_DEFAULT,
+        'radius_by_type': RADIUS_BY_TYPE_DEFAULT.copy(),
+        'flow_multiplier_by_type': {'private': 1.0, 'government': 1.0},
+        'targeted_protection_enabled': False,
+        'stone_town_sewer_enabled': True,      # NEW FLAG
+        'od_reduction_percent': 95.0,
+        'infrastructure_upgrade_percent': 90.0, # Very aggressive
+        'centralized_treatment_enabled': True, # WWTP enabled
+        'fecal_sludge_treatment_percent': 90.0
     }
 }

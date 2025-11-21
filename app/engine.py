@@ -152,20 +152,76 @@ def apply_interventions(df: pd.DataFrame, scenario: Dict[str, Any]) -> pd.DataFr
     # Fecal Sludge Treatment (Septic -> Better Septic/Sewer eff)
     fst = scenario.get('fecal_sludge_treatment_percent', 0.0) / 100.0
     if fst > 0:
-        # Assume treated septic reaches 80% efficiency
-        res = convert_fraction(df['toilet_category_id'] == 3, fst, 3, 0.80)
+        # Use the best septic efficiency from config (not hardcoded 0.80)
+        res = convert_fraction(df['toilet_category_id'] == 3, fst, 3, eff_map[3])
         if res is not None: new_rows.append(res)
 
     if new_rows:
         df = pd.concat([df] + new_rows, ignore_index=True)
 
-    # Centralized Treatment (Sewer efficiency boost)
-    if scenario.get('centralized_treatment_enabled'):
-        df.loc[df['toilet_category_id'] == 1, 'pathogen_containment_efficiency'] = 0.90
-
-    # Recalculate efficiency for non-overridden rows just in case
-    # (Logic simplified: we updated specific rows, so we trust the column now)
+    # --- Spatial Interventions (New for Scenarios) ---
     
+    # Scenario 1: Targeted Protection (Top 5% Risk)
+    if scenario.get('targeted_protection_enabled'):
+        # Load Baseline Risk if available
+        baseline_path = config.FIO_CONCENTRATION_PATH
+        if baseline_path.exists():
+            logging.info("Loading Baseline Risk for Targeted Protection...")
+            bdf = pd.read_csv(baseline_path)
+            if 'risk_score' in bdf.columns:
+                # Top 5% Risk
+                threshold = bdf['risk_score'].quantile(0.95)
+                high_risk_bh = bdf[bdf['risk_score'] >= threshold]
+                logging.info(f"Identified {len(high_risk_bh)} High-Risk Boreholes (Score > {threshold:.1f})")
+                
+                # Find toilets within 50m of these boreholes
+                from sklearn.neighbors import BallTree
+                
+                # Build Tree of Toilets
+                df_rad = np.deg2rad(df[['lat', 'long']].values)
+                bh_rad = np.deg2rad(high_risk_bh[['lat', 'long']].values)
+                
+                tree = BallTree(df_rad, metric='haversine')
+                
+                # Query radius (50m)
+                radius_rad = 50.0 / config.EARTH_RADIUS_M
+                indices = tree.query_radius(bh_rad, r=radius_rad)
+                
+                # Flatten indices
+                toilet_indices = np.unique(np.concatenate(indices))
+                
+                # Upgrade these toilets to Septic (3) with high efficiency
+                if len(toilet_indices) > 0:
+                    logging.info(f"Upgrading {len(toilet_indices)} toilets near high-risk boreholes.")
+                    df.loc[toilet_indices, 'toilet_category_id'] = 3
+                    df.loc[toilet_indices, 'pathogen_containment_efficiency'] = 0.50 # Improved Septic
+            else:
+                logging.warning("Baseline file missing 'risk_score'. Skipping Targeted Protection.")
+        else:
+            logging.warning("Baseline results not found. Run 'baseline_2025' first.")
+
+    # Scenario 3: Stone Town Sewer
+    if scenario.get('stone_town_sewer_enabled'):
+        # Stone Town Bounding Box (Approx)
+        # Lat: -6.166 to -6.155, Long: 39.185 to 39.195
+        mask = (
+            (df['lat'] >= -6.170) & (df['lat'] <= -6.150) &
+            (df['long'] >= 39.180) & (df['long'] <= 39.200)
+        )
+        count = mask.sum()
+        if count > 0:
+            # Get treatment efficiency from scenario (default 0.90)
+            treatment_eff = scenario.get('treatment_efficiency', 0.90)
+            logging.info(f"Sewering Stone Town: Upgrading {count} toilets to Sewer (Efficiency: {treatment_eff:.0%}).")
+            df.loc[mask, 'toilet_category_id'] = 1
+            df.loc[mask, 'pathogen_containment_efficiency'] = treatment_eff
+
+    # Centralized Treatment (Sewer efficiency boost globally)
+    if scenario.get('centralized_treatment_enabled'):
+        treatment_eff = scenario.get('treatment_efficiency', 0.90)
+        df.loc[df['toilet_category_id'] == 1, 'pathogen_containment_efficiency'] = treatment_eff
+        logging.info(f"Applied centralized treatment efficiency: {treatment_eff:.0%}")
+
     return df[df['household_population'] > 0].reset_index(drop=True)
 
 # --- Step 2: Layer 1 Calculation ---
@@ -277,8 +333,8 @@ def compute_concentration(boreholes: pd.DataFrame, flow_multiplier: float = 1.0)
 
 # --- Main Pipeline ---
 
-def run_pipeline(model_type: str, scenario_name: str = 'crisis_2025_current', scenario_override: Dict[str, Any] = None):
-    base_scenario = config.SCENARIOS.get(scenario_name, config.SCENARIOS['crisis_2025_current'])
+def run_pipeline(model_type: str, scenario_name: str = 'baseline_2025', scenario_override: Dict[str, Any] = None):
+    base_scenario = config.SCENARIOS.get(scenario_name, config.SCENARIOS['baseline_2025'])
     
     # Merge override if provided
     if scenario_override:
