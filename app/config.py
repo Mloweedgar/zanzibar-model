@@ -33,10 +33,15 @@ NET_NITROGEN_LOAD_PATH = OUTPUT_DATA_DIR / 'nitrogen_load_layer1.csv'
 
 # --- Constants ---
 EARTH_RADIUS_M = 6371000
-# Default FIO params
-EFIO_DEFAULT = 8.96e9  # CFU/person/day
-KS_PER_M_DEFAULT = 0.003  # Decay rate per meter
-# Default Nitrogen params
+# Model Constants
+# Calibrated on 2025-11-21 after unit fix and expanded grid search
+# CRITICAL: Unit bug fixed in engine.py:234 (was *100, now /10)
+# Best params from 42-combo search: decay=0.05, EFIO=1e7
+# Note: These are "least bad" fits, not physically validated values
+EFIO_DEFAULT = 1e7          # CFU/person/day (Best fit: 1e7, down from 1e9)
+KS_PER_M_DEFAULT = 0.05     # Decay rate per meter (Best fit: 0.05, unchanged)
+
+# Nitrogen Constants
 PROTEIN_PER_CAPITA_DEFAULT = 0.060  # kg/person/day (approx 60g)
 PROTEIN_TO_NITROGEN_CONVERSION = 0.16  # 16% of protein is nitrogen
 

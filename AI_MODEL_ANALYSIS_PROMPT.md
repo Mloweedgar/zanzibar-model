@@ -1,10 +1,4 @@
-# AI Model Analysis Prompt Template
 
-Use this prompt when you need an AI to deeply analyze a codebase and explain it comprehensively for presentations, onboarding, or documentation.
-
----
-
-## 📋 FULL PROMPT (Copy & Paste)
 
 ```
 I need you to comprehensively analyze this codebase and create a complete understanding guide. I have a [presentation/meeting/review] [tomorrow/soon] and need to understand the model/system end-to-end.
@@ -334,4 +328,3 @@ Here's how this prompt was used for the Zanzibar FIO model:
 
 ---
 
-*Copy the main prompt above and customize for your specific needs!*

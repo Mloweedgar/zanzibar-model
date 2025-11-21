@@ -225,19 +225,29 @@ def run_transport(toilets: pd.DataFrame, boreholes: pd.DataFrame, pcfg: Pollutan
 
 def compute_concentration(boreholes: pd.DataFrame) -> pd.DataFrame:
     """Convert aggregated load to concentration."""
-    # Conc = Load / Flow
-    # Ensure Q is present
+    # Conc = Load / Flow, converted to CFU/100mL
+    # Load is in CFU/day, Q is in L/day
+    # Load/Q gives CFU/L
+    # To convert CFU/L to CFU/100mL: divide by 10 (since 1L = 10×100mL)
     if 'Q_L_per_day' not in boreholes.columns:
         logging.warning("Q_L_per_day missing, using default 1000L")
         boreholes['Q_L_per_day'] = 1000.0
         
-    boreholes['concentration_CFU_per_100mL'] = (boreholes['aggregated_load'] / boreholes['Q_L_per_day']) * 100.0
+    boreholes['concentration_CFU_per_100mL'] = (boreholes['aggregated_load'] / boreholes['Q_L_per_day']) / 10.0
     return boreholes
 
 # --- Main Pipeline ---
 
-def run_pipeline(model_type: str, scenario_name: str = 'crisis_2025_current'):
-    scenario = config.SCENARIOS.get(scenario_name, config.SCENARIOS['crisis_2025_current'])
+def run_pipeline(model_type: str, scenario_name: str = 'crisis_2025_current', scenario_override: Dict[str, Any] = None):
+    base_scenario = config.SCENARIOS.get(scenario_name, config.SCENARIOS['crisis_2025_current'])
+    
+    # Merge override if provided
+    if scenario_override:
+        scenario = base_scenario.copy()
+        scenario.update(scenario_override)
+    else:
+        scenario = base_scenario
+        
     pcfg = _get_pollutant_config(model_type, scenario)
     
     logging.info(f"Starting {model_type.upper()} Pipeline | Scenario: {scenario_name}")

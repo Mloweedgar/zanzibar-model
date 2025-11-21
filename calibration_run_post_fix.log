@@ -1,0 +1,192 @@
+2025-11-21 00:21:43,123 - INFO - Loaded 60 government boreholes
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+/Users/edgar/zanzibar/zanzibar-model/app/calibration_engine.py:20: DtypeWarning: Columns (20,21,28,32,38,42) have mixed types. Specify dtype option on import or set low_memory=False.
+  self.model_df = pd.read_csv(path)
+Starting Grid Search: 42 combinations
+Testing: Decay=0.001, EFIO=1e+07
+  -> RMSE: 5.2017, Corr: 0.1026
+Testing: Decay=0.001, EFIO=5e+07
+  -> RMSE: 6.4433, Corr: 0.1026
+Testing: Decay=0.001, EFIO=1e+08
+  -> RMSE: 6.9928, Corr: 0.1026
+Testing: Decay=0.001, EFIO=5e+08
+  -> RMSE: 8.2902, Corr: 0.1026
+Testing: Decay=0.001, EFIO=1e+09
+  -> RMSE: 8.8556, Corr: 0.1026
+Testing: Decay=0.001, EFIO=5e+09
+  -> RMSE: 10.1793, Corr: 0.1026
+Testing: Decay=0.001, EFIO=1e+10
+  -> RMSE: 10.7529, Corr: 0.1026
+Testing: Decay=0.005, EFIO=1e+07
+  -> RMSE: 4.9878, Corr: 0.1048
+Testing: Decay=0.005, EFIO=5e+07
+  -> RMSE: 6.2187, Corr: 0.1048
+Testing: Decay=0.005, EFIO=1e+08
+  -> RMSE: 6.7653, Corr: 0.1048
+Testing: Decay=0.005, EFIO=5e+08
+  -> RMSE: 8.0581, Corr: 0.1048
+Testing: Decay=0.005, EFIO=1e+09
+  -> RMSE: 8.6222, Corr: 0.1048
+Testing: Decay=0.005, EFIO=5e+09
+  -> RMSE: 9.9435, Corr: 0.1048
+Testing: Decay=0.005, EFIO=1e+10
+  -> RMSE: 10.5164, Corr: 0.1048
+Testing: Decay=0.01, EFIO=1e+07
+  -> RMSE: 4.7303, Corr: 0.1079
+Testing: Decay=0.01, EFIO=5e+07
+  -> RMSE: 5.9461, Corr: 0.1079
+Testing: Decay=0.01, EFIO=1e+08
+  -> RMSE: 6.4886, Corr: 0.1079
+Testing: Decay=0.01, EFIO=5e+08
+  -> RMSE: 7.7751, Corr: 0.1079
+Testing: Decay=0.01, EFIO=1e+09
+  -> RMSE: 8.3373, Corr: 0.1079
+Testing: Decay=0.01, EFIO=5e+09
+  -> RMSE: 9.6555, Corr: 0.1079
+Testing: Decay=0.01, EFIO=1e+10
+  -> RMSE: 10.2274, Corr: 0.1079
+Testing: Decay=0.02, EFIO=1e+07
+  -> RMSE: 4.2516, Corr: 0.1153
+Testing: Decay=0.02, EFIO=5e+07
+  -> RMSE: 5.4299, Corr: 0.1153
+Testing: Decay=0.02, EFIO=1e+08
+  -> RMSE: 5.9627, Corr: 0.1153
+Testing: Decay=0.02, EFIO=5e+08
+  -> RMSE: 7.2341, Corr: 0.1153
+Testing: Decay=0.02, EFIO=1e+09
+  -> RMSE: 7.7920, Corr: 0.1153
+Testing: Decay=0.02, EFIO=5e+09
+  -> RMSE: 9.1028, Corr: 0.1153
+Testing: Decay=0.02, EFIO=1e+10
+  -> RMSE: 9.6724, Corr: 0.1153
+Testing: Decay=0.03, EFIO=1e+07
+  -> RMSE: 3.8271, Corr: 0.1244
+Testing: Decay=0.03, EFIO=5e+07
+  -> RMSE: 4.9556, Corr: 0.1244
+Testing: Decay=0.03, EFIO=1e+08
+  -> RMSE: 5.4758, Corr: 0.1244
+Testing: Decay=0.03, EFIO=5e+08
+  -> RMSE: 6.7282, Corr: 0.1244
+Testing: Decay=0.03, EFIO=1e+09
+  -> RMSE: 7.2807, Corr: 0.1244
+Testing: Decay=0.03, EFIO=5e+09
+  -> RMSE: 8.5827, Corr: 0.1244
+Testing: Decay=0.03, EFIO=1e+10
+  -> RMSE: 9.1495, Corr: 0.1244
+Testing: Decay=0.05, EFIO=1e+07
+  -> RMSE: 3.1663, Corr: 0.1469
+Testing: Decay=0.05, EFIO=5e+07
+  -> RMSE: 4.1454, Corr: 0.1469
+Testing: Decay=0.05, EFIO=1e+08
+  -> RMSE: 4.6281, Corr: 0.1469
+Testing: Decay=0.05, EFIO=5e+08
+  -> RMSE: 5.8257, Corr: 0.1469
+Testing: Decay=0.05, EFIO=1e+09
+  -> RMSE: 6.3630, Corr: 0.1469
+Testing: Decay=0.05, EFIO=5e+09
+  -> RMSE: 7.6406, Corr: 0.1469
+Testing: Decay=0.05, EFIO=1e+10
+  -> RMSE: 8.2000, Corr: 0.1469
+
+========================================
+CALIBRATION RESULTS
+========================================
+
+Best RMSE Configuration:
+decay_rate     5.000000e-02
+efio           1.000000e+07
+rmse_log       3.166259e+00
+bias_log       8.645321e-01
+correlation    1.469286e-01
+Name: 35, dtype: float64
+
+Best Correlation Configuration:
+decay_rate     5.000000e-02
+efio           5.000000e+07
+rmse_log       4.145396e+00
+bias_log       2.018192e+00
+correlation    1.469286e-01
+Name: 36, dtype: float64
+
+Full results saved to 'calibration_results.csv'
