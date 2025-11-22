@@ -29,6 +29,17 @@ python main.py dashboard
 ```
 Use the sidebar to switch views (Pathogen Risk, Nitrogen Load, Phosphorus Load, Toilet Inventory) and rerun scenarios.
 
+### Calibration
+To run the calibration suite (grid search + random forest cross-validation):
+```bash
+python main.py calibration
+```
+This will:
+1. Run a grid search over physical parameters (EFIO, decay rate, radius).
+2. Save the best parameters to `data/output/calibration_grid_results.csv`.
+3. Run a Random Forest cross-validation to estimate the theoretical best performance.
+
+
 ### Inputs
 - Derived/bundled inputs already in `data/derived/`: `private_boreholes_enriched.csv`, `government_boreholes_enriched.csv`, `sanitation_standardized.csv`.
 - If you swap raw inputs, regenerate these yourself (no derive CLI shipped).

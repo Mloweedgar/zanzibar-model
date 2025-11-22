@@ -2,7 +2,7 @@
 
 import argparse
 import sys
-from app import engine
+from app import engine, calibrate_runner
 
 def main():
     parser = argparse.ArgumentParser(description="Zanzibar FIO/Nitrogen/Phosphorus Model CLI")
@@ -15,6 +15,9 @@ def main():
     
     # Dashboard Command
     dash_parser = subparsers.add_parser('dashboard', help='Launch the dashboard')
+
+    # Calibration Command
+    calib_parser = subparsers.add_parser('calibration', help='Run the calibration suite')
     
     args = parser.parse_args()
     
@@ -32,9 +35,19 @@ def main():
         # Force PYTHONPATH to include current directory first to avoid name collisions
         cwd = os.getcwd()
         os.system(f"PYTHONPATH='{cwd}:$PYTHONPATH' streamlit run app/dashboard.py")
+
+    elif args.command == 'calibration':
+        print("Starting calibration suite...")
+        try:
+            calibrate_runner.main()
+        except Exception as e:
+            print(f"Calibration failed: {e}")
+            sys.exit(1)
+
         
     else:
         parser.print_help()
 
 if __name__ == "__main__":
     main()
+

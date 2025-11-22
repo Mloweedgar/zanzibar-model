@@ -27,7 +27,7 @@ FEATURE_RADII = (50, 100, 200, 500, 1000)
 
 def _prepare_inputs() -> Tuple[pd.DataFrame, pd.DataFrame, Dict]:
     """Load common inputs once to avoid repeated I/O in calibration."""
-    base_scenario = copy.deepcopy(config.SCENARIOS["crisis_2025_current"])
+    base_scenario = copy.deepcopy(config.SCENARIOS["baseline_2025"])
     sanitation = engine.apply_interventions(
         engine.load_and_standardize_sanitation(), base_scenario
     )
@@ -175,12 +175,65 @@ def run_random_forest_cv(
     }
 
 
+def print_calibration_report(metrics: pd.Series):
+    """Print a readable scorecard for the calibration results."""
+    print("\n" + "="*60)
+    print("CALIBRATION SCORECARD")
+    print("="*60)
+    
+    # Thresholds
+    THRESHOLDS = {
+        'spearman_rho': {'target': 0.4, 'min': 0.2, 'name': 'Spearman Rank Correlation'},
+        'kendall_rho': {'target': 0.3, 'min': 0.15, 'name': 'Kendall Rank Correlation'},
+        'rmse_log': {'target': 1.0, 'min': 2.0, 'name': 'Log RMSE (Lower is better)', 'reverse': True}
+    }
+    
+    print(f"{'Metric':<30} | {'Value':<8} | {'Target':<15} | {'Status'}")
+    print("-" * 60)
+    
+    for key, cfg in THRESHOLDS.items():
+        val = metrics.get(key, 0.0)
+        target = cfg['target']
+        minimum = cfg['min']
+        name = cfg['name']
+        reverse = cfg.get('reverse', False)
+        
+        # Determine status
+        if reverse:
+            # Lower is better
+            if val <= target:
+                status = "✅ EXCELLENT"
+            elif val <= minimum:
+                status = "⚠️ ACCEPTABLE"
+            else:
+                status = "❌ POOR"
+            target_str = f"< {target}"
+        else:
+            # Higher is better
+            if val >= target:
+                status = "✅ EXCELLENT"
+            elif val >= minimum:
+                status = "⚠️ ACCEPTABLE"
+            else:
+                status = "❌ POOR"
+            target_str = f"> {target}"
+            
+        print(f"{name:<30} | {val:8.3f} | {target_str:<15} | {status}")
+        
+    print("-" * 60)
+    print("Physical Parameters:")
+    print(f"  EFIO:   {metrics.get('efio', 0):.1e}")
+    print(f"  Decay:  {metrics.get('ks', 0):.3f} /m")
+    print(f"  Radius: {metrics.get('radius_g', 0):.0f} m")
+    print("="*60 + "\n")
+
+
 def main():
     sanitation, gov_boreholes, scenario_base = _prepare_inputs()
     print("Running parameter grid search...")
     grid_results = run_grid_search()
     best = grid_results.iloc[0]
-    print("Top grid result:", best.to_dict())
+    print_calibration_report(best)
 
     print("Running data-driven RF CV (upper bound on trend signal)...")
     rf_metrics = run_random_forest_cv(sanitation, calibration_utils.load_government_data())

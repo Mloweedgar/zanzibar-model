@@ -255,6 +255,7 @@ def compute_load(df: pd.DataFrame, pcfg: PollutantConfig, save_output: bool = Tr
     
     # Save intermediate (optional, skip during grid-search calibration to avoid I/O cost)
     if save_output:
+        # TODO: drop columns that are not needed for the next step
         df.to_csv(pcfg.output_load_path, index=False)
         logging.info(f"Saved Layer 1 load to {pcfg.output_load_path}")
     return df
@@ -380,6 +381,7 @@ def run_pipeline(model_type: str, scenario_name: str = 'baseline_2025', scenario
         
     if results:
         final_df = pd.concat(results, ignore_index=True)
+        # TODO: drop columns that are not needed for the next step
         final_df.to_csv(pcfg.output_conc_path, index=False)
         logging.info(f"Saved FIO concentrations to {pcfg.output_conc_path}")
     else:

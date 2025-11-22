@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from sklearn.neighbors import BallTree
+
 import logging
 from scipy.stats import spearmanr, kendalltau, median_abs_deviation
 from app import config
@@ -8,7 +8,7 @@ from app import calibration_utils
 
 class CalibrationEngine:
     def __init__(self):
-        self.obs_df = calibration_utils.load_government_data()
+        # No longer loading external obs file, will use model output directly
         self.model_df = pd.DataFrame()
         
     def load_model_results(self, model_type='fio'):
@@ -23,40 +23,39 @@ class CalibrationEngine:
 
     def match_points(self):
         """
-        Match each government observation to the nearest model prediction point.
-        Returns DataFrame with matched pairs.
+        Prepare matched DataFrame from model results.
+        Since model output preserves input columns, we just need to:
+        1. Filter for government boreholes
+        2. Parse the observed 'Total Coli' column
         """
-        if self.obs_df.empty or self.model_df.empty:
+        if self.model_df.empty:
             return pd.DataFrame()
             
-        # Build BallTree on model points
-        # Convert lat/long to radians for BallTree
-        model_rad = np.radians(self.model_df[['lat', 'long']].values)
-        obs_rad = np.radians(self.obs_df[['lat', 'long']].values)
+        # Filter for government boreholes only
+        # (Private wells don't have lab data in this context)
+        if 'borehole_type' in self.model_df.columns:
+            matched = self.model_df[self.model_df['borehole_type'] == 'government'].copy()
+        else:
+            # Fallback if column missing (unlikely)
+            matched = self.model_df.copy()
+            
+        # Check if observation column exists
+        if 'Total Coli' not in matched.columns:
+            logging.warning("'Total Coli' column not found in model output. Cannot calibrate.")
+            return pd.DataFrame()
+            
+        # Parse observations using the utility function
+        matched['fio_obs'] = matched['Total Coli'].apply(calibration_utils.parse_concentration)
         
-        tree = BallTree(model_rad, metric='haversine')
+        # Rename model prediction to standard name for metrics
+        matched['model_conc'] = matched['concentration_CFU_per_100mL']
         
-        # Query nearest neighbor for each observation
-        dist, ind = tree.query(obs_rad, k=1)
-        
-        # Create matched DataFrame
-        matched = self.obs_df.copy()
-        matched['model_idx'] = ind.flatten()
-        matched['dist_m'] = dist.flatten() * 6371000 # Convert rad to meters
-        
-        # Join model values
-        # We use iloc to fetch rows by integer index
-        model_vals = self.model_df.iloc[matched['model_idx']].reset_index(drop=True)
-        
-        # Combine
-        matched['model_conc'] = model_vals['concentration_CFU_per_100mL'].values
-        matched['model_lat'] = model_vals['lat'].values
-        matched['model_lat'] = model_vals['lat'].values
-        matched['model_long'] = model_vals['long'].values
-        if 'risk_score' in model_vals.columns:
-            matched['risk_score'] = model_vals['risk_score'].values
+        # Keep coordinates for debugging/plotting if needed
+        matched['model_lat'] = matched['lat']
+        matched['model_long'] = matched['long']
         
         return matched
+
 
     def calculate_metrics(self, matched_df):
         """Calculate RMSE and other metrics, including robust alternatives."""
