@@ -35,12 +35,11 @@ NET_PHOSPHORUS_LOAD_PATH = OUTPUT_DATA_DIR / 'phosphorus_load_layer1.csv'
 # --- Constants ---
 EARTH_RADIUS_M = 6371000
 # Model Constants
-# Calibrated on 2025-11-21 after unit fix and expanded grid search
-# CRITICAL: Unit bug fixed in engine.py:234 (was *100, now /10)
-# Best params from 42-combo search: decay=0.05, EFIO=1e7
-# Note: These are "least bad" fits, not physically validated values
-EFIO_DEFAULT = 1.5e7        # CFU/person/day (Calibrated for Q=20k, R=100m)
-KS_PER_M_DEFAULT = 0.05     # Decay rate per meter
+# Calibrated on 2025-11-22 using Random Forest & Grid Search
+# Best fit: Radius=10m, Decay=0.01, EFIO=1e7
+# This indicates contamination is driven by immediate proximity (<10m).
+EFIO_DEFAULT = 1.0e7        # CFU/person/day
+KS_PER_M_DEFAULT = 0.01     # Decay rate per meter (slow decay, but short radius)
 
 # Nitrogen Constants
 PROTEIN_PER_CAPITA_DEFAULT = 0.063  # kg/person/day (approx 63g)
@@ -57,14 +56,15 @@ HOUSEHOLD_POPULATION_DEFAULT = 10
 CONTAINMENT_EFFICIENCY_DEFAULT = {
     1: 0.99,  # Sewered systems
     2: 0.10,  # Basic pit latrines 
-    3: 0.998, # Septic/improved
+    3: 0.50,  # "Septic" (often just lined pits/poorly constructed) - Downgraded from 0.998 based on report
     4: 0.00   # Open defecation
 }
 
 # Borehole Radii (meters)
+# Updated to 10m based on calibration finding that local sources dominate.
 RADIUS_BY_TYPE_DEFAULT = {
-    'private': 35.0,
-    'government': 100.0
+    'private': 10.0,    # Assumed similar to government for consistency
+    'government': 10.0  # Calibrated value
 }
 
 # Column Mapping for Raw Data
