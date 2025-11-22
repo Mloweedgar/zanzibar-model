@@ -43,7 +43,7 @@ EFIO_DEFAULT = 1.5e7        # CFU/person/day (Calibrated for Q=20k, R=100m)
 KS_PER_M_DEFAULT = 0.05     # Decay rate per meter
 
 # Nitrogen Constants
-PROTEIN_PER_CAPITA_DEFAULT = 0.060  # kg/person/day (approx 60g)
+PROTEIN_PER_CAPITA_DEFAULT = 0.063  # kg/person/day (approx 63g)
 PROTEIN_TO_NITROGEN_CONVERSION = 0.16  # 16% of protein is nitrogen
 
 # Phosphorus Constants (detergent-based)
@@ -53,23 +53,18 @@ PHOSPHORUS_DETERGENT_PHOSPHORUS_FRACTION = 0.05       # fraction (5% P content)
 HOUSEHOLD_POPULATION_DEFAULT = 10
 
 # Containment Efficiencies (1 - leakage)
-# Updated to allow "zero critical" at 100% interventions
-# Values represent best-in-class infrastructure with:
-# - Regular maintenance and FSM
-# - High-quality treatment plants
-# - Proper construction and monitoring
 # 1: Sewer, 2: Pit, 3: Septic, 4: OD
 CONTAINMENT_EFFICIENCY_DEFAULT = {
-    1: 0.99,  # Sewered systems (was 0.50) - 99% with modern WWTP
-    2: 0.10,  # Basic pit latrines (unchanged)
-    3: 0.998, # Septic/improved (was 0.30) - 99.8% with world-class FSM
-    4: 0.00   # Open defecation (unchanged)
+    1: 0.99,  # Sewered systems
+    2: 0.10,  # Basic pit latrines 
+    3: 0.998, # Septic/improved
+    4: 0.00   # Open defecation
 }
 
 # Borehole Radii (meters)
 RADIUS_BY_TYPE_DEFAULT = {
     'private': 35.0,
-    'government': 100.0 # Increased to 100m to capture larger influence zone
+    'government': 100.0
 }
 
 # Column Mapping for Raw Data
@@ -88,7 +83,7 @@ SCENARIOS = {
         'description': 'Current situation with no interventions.',
         'pop_factor': 1.0,
         'display_name': '📊 Baseline 2025 (Status Quo)',
-        'description': 'Current sanitation conditions with no interventions. Represents the existing infrastructure: 14% sewer-connected septic, 49% septic tanks (mostly poorly constructed), 34% basic pit latrines, and 3% open defecation.',
+        'description': 'Current sanitation conditions with no interventions. Represents the existing infrastructure',
         'pop_factor': 1.0,
         'EFIO_override': EFIO_DEFAULT,
         'ks_per_m': KS_PER_M_DEFAULT,
@@ -105,7 +100,7 @@ SCENARIOS = {
     },
     'scenario_1_targeted': {
         'display_name': '🎯 Scenario 1: Targeted Borehole Protection and FSM Strengthening',
-        'description': 'Focused intervention for rapid public health benefits. Protects top 5% highest-risk boreholes (~950) with mandatory 35m protection zones, rehabilitates Kizimbani and Kibele treatment plants, and implements Community-Led Total Sanitation (CLTS) campaigns in contamination hotspots.',
+        'description': 'Focused intervention for rapid public health benefits. Protects high boreholes with mandatory 35m protection zones, rehabilitates Kizimbani and Kibele treatment plants, and implements Community-Led Total Sanitation (CLTS) campaigns in contamination hotspots.',
         'pop_factor': 1.0,
         'EFIO_override': EFIO_DEFAULT,
         'ks_per_m': KS_PER_M_DEFAULT,
