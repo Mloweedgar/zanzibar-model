@@ -143,17 +143,18 @@ def apply_interventions(df: pd.DataFrame, scenario: Dict[str, Any]) -> pd.DataFr
         res = convert_fraction(df['toilet_category_id'] == 4, od_red, 3, eff_map[3])
         if res is not None: new_rows.append(res)
 
-    # Pit Upgrade -> Septic
+    # Pit Upgrade -> Septic (Well-managed: 80% efficiency)
     pit_up = scenario.get('infrastructure_upgrade_percent', 0.0) / 100.0
     if pit_up > 0:
-        res = convert_fraction(df['toilet_category_id'] == 2, pit_up, 3, eff_map[3])
+        # Report says "upgrading... to a well-managed septic system (80% containment)"
+        res = convert_fraction(df['toilet_category_id'] == 2, pit_up, 3, 0.80)
         if res is not None: new_rows.append(res)
 
     # Fecal Sludge Treatment (Septic -> Better Septic/Sewer eff)
     fst = scenario.get('fecal_sludge_treatment_percent', 0.0) / 100.0
     if fst > 0:
-        # Use the best septic efficiency from config (not hardcoded 0.80)
-        res = convert_fraction(df['toilet_category_id'] == 3, fst, 3, eff_map[3])
+        # Upgrade existing poor septics (0.50) to well-managed (0.80)
+        res = convert_fraction(df['toilet_category_id'] == 3, fst, 3, 0.80)
         if res is not None: new_rows.append(res)
 
     if new_rows:
@@ -183,18 +184,18 @@ def apply_interventions(df: pd.DataFrame, scenario: Dict[str, Any]) -> pd.DataFr
                 
                 tree = BallTree(df_rad, metric='haversine')
                 
-                # Query radius (50m)
-                radius_rad = 50.0 / config.EARTH_RADIUS_M
+                # Query radius (35m) - Matches Report Scenario 1
+                radius_rad = 35.0 / config.EARTH_RADIUS_M
                 indices = tree.query_radius(bh_rad, r=radius_rad)
                 
                 # Flatten indices
                 toilet_indices = np.unique(np.concatenate(indices))
                 
-                # Upgrade these toilets to Septic (3) with high efficiency
+                # Upgrade these toilets to Septic (3) with high efficiency (Well-managed)
                 if len(toilet_indices) > 0:
                     logging.info(f"Upgrading {len(toilet_indices)} toilets near high-risk boreholes.")
                     df.loc[toilet_indices, 'toilet_category_id'] = 3
-                    df.loc[toilet_indices, 'pathogen_containment_efficiency'] = 0.50 # Improved Septic
+                    df.loc[toilet_indices, 'pathogen_containment_efficiency'] = 0.80 # Well-managed Septic (Report Scenario 2 target)
             else:
                 logging.warning("Baseline file missing 'risk_score'. Skipping Targeted Protection.")
         else:
