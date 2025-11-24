@@ -1,0 +1,34 @@
+{
+  "sanitation_inventory": {
+    "total_records": 279934,
+    "category_counts": {
+      "3": 137573,
+      "2": 95104,
+      "4": 39230,
+      "1": 8027
+    },
+    "category_share_percent": {
+      "3": 49.14479841676967,
+      "2": 33.97372237741754,
+      "4": 14.014017589860467,
+      "1": 2.8674616159523314
+    }
+  },
+  "private_boreholes": {
+    "raw_records": 18916,
+    "enriched_records": 18916,
+    "q_l_per_day_stats": {
+      "min": 142.85714285714286,
+      "median": 2000.0,
+      "max": 25000.0
+    }
+  },
+  "government_boreholes": {
+    "raw_records": 60,
+    "enriched_records": 60,
+    "q_l_per_day_assumption": 20000.0,
+    "lab_total_coliform_detects": 55,
+    "lab_total_coliform_positive": 48,
+    "lab_total_coliform_positive_share_percent": 87.27272727272727
+  }
+}
