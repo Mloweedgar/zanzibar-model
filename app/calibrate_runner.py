@@ -17,7 +17,7 @@ from app.calibration_engine import CalibrationEngine
 DEFAULT_GRID = {
     "efio": [1e6, 5e6, 1e7],
     "ks": [0.01, 0.05, 0.1, 0.2, 0.5],
-    "radius_g": [10.0, 25.0, 50.0, 100.0, 250.0, 500.0],
+    "radius_g": [5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0],
     "flow_mult": [1.0, 10.0, 100.0],
 }
 

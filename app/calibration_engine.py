@@ -61,42 +61,55 @@ class CalibrationEngine:
         """Calculate RMSE and other metrics, including robust alternatives."""
         if matched_df.empty:
             return {}
-            
+
         # Filter valid pairs (ignore NaNs)
         valid = matched_df.dropna(subset=['fio_obs', 'model_conc'])
-        
+
         if valid.empty:
             return {}
-            
+
         y_true = valid['fio_obs']
         y_pred = valid['model_conc']
-        
+
+        def _has_variation(arr) -> bool:
+            """Check if array/series has non-zero variance (ignores NaNs)."""
+            return np.nanstd(arr) > 0
+
+        def _safe_stat(a, b, func):
+            if len(a) == 0 or len(b) == 0:
+                return np.nan
+            if not (_has_variation(a) and _has_variation(b)):
+                return np.nan
+            return float(func(a, b))
+
         # Log-space RMSE (since concentrations vary by orders of magnitude)
         # Add 1 to avoid log(0)
         log_true = np.log1p(y_true)
         log_pred = np.log1p(y_pred)
-        
+
         rmse = np.sqrt(((log_true - log_pred) ** 2).mean())
         bias = (log_pred - log_true).mean()
-        
+
         # Robust metrics (less sensitive to outliers)
         mad = median_abs_deviation(log_true - log_pred, nan_policy='omit')
-        
+
         # Rank correlations (raw + log space)
-        spearman_rho, spearman_p = spearmanr(y_true, y_pred, nan_policy='omit')
-        spearman_log, _ = spearmanr(log_true, log_pred, nan_policy='omit')
-        kendall_rho, kendall_p = kendalltau(y_true, y_pred, nan_policy='omit')
-        
+        spearman_rho = _safe_stat(y_true, y_pred, lambda a, b: spearmanr(a, b, nan_policy='omit').correlation)
+        spearman_p = np.nan if np.isnan(spearman_rho) else spearmanr(y_true, y_pred, nan_policy='omit').pvalue
+        spearman_log = _safe_stat(log_true, log_pred, lambda a, b: spearmanr(a, b, nan_policy='omit').correlation)
+        kendall_rho = _safe_stat(y_true, y_pred, lambda a, b: kendalltau(a, b, nan_policy='omit').correlation)
+        kendall_p = np.nan if np.isnan(kendall_rho) else kendalltau(y_true, y_pred, nan_policy='omit').pvalue
+
         return {
             'n_samples': len(valid),
             'rmse_log': rmse,
             'bias_log': bias,
-            'correlation': valid['fio_obs'].corr(valid['model_conc']),
-            'correlation_log': log_true.corr(log_pred),
+            'correlation': _safe_stat(y_true, y_pred, lambda a, b: np.corrcoef(a, b)[0, 1]),
+            'correlation_log': _safe_stat(log_true, log_pred, lambda a, b: np.corrcoef(a, b)[0, 1]),
             'mad': mad,
-            'spearman_rho': spearman_rho,
-            'spearman_log_rho': spearman_log,
+            'spearman_rho': 0.0 if np.isnan(spearman_rho) else spearman_rho,
+            'spearman_log_rho': 0.0 if np.isnan(spearman_log) else spearman_log,
             'spearman_p': spearman_p,
-            'kendall_rho': kendall_rho,
+            'kendall_rho': 0.0 if np.isnan(kendall_rho) else kendall_rho,
             'kendall_p': kendall_p
         }

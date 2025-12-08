@@ -11,6 +11,7 @@ import streamlit as st
 import pandas as pd
 import pydeck as pdk
 import numpy as np
+import json
 from typing import Dict, Any
 
 import sys
@@ -32,6 +33,16 @@ def load_data(path):
     if not path.exists():
         return pd.DataFrame()
     return pd.read_csv(path, low_memory=False)
+
+@st.cache_data
+def load_geojson(path: Path):
+    if not path.exists():
+        return None
+    try:
+        with path.open() as f:
+            return json.load(f)
+    except Exception:
+        return None
 
 def get_color(val, min_val, max_val, palette='risk'):
     """Return color [r,g,b,a] based on value."""
@@ -145,9 +156,28 @@ def get_color(val, min_val, max_val, palette='risk'):
     else:
         return [100, 100, 100, 200]
 
+def build_wards_layer():
+    """Optional ward boundaries overlay with informative tooltip."""
+    geojson = load_geojson(config.WARDS_GEOJSON_PATH)
+    if not geojson:
+        return None
+    return pdk.Layer(
+        "GeoJsonLayer",
+        data=geojson,
+        stroked=True,
+        filled=True,
+        get_fill_color=[0, 0, 0, 0],  # invisible fill for easier hover
+        get_line_color=[30, 30, 30, 160],
+        get_line_width=2,
+        line_width_min_pixels=1,
+        pickable=True,
+        auto_highlight=True
+    )
+
 # --- Views ---
 
-def view_pathogen_risk(map_style, viz_type="Scatterplot"):
+def view_pathogen_risk(map_style, viz_type="Scatterplot", extra_layers=None, tooltip=None):
+    extra_layers = extra_layers or []
     st.header("🦠 Pathogen Risk")
     
     df = load_data(config.FIO_CONCENTRATION_PATH)
@@ -211,7 +241,6 @@ def view_pathogen_risk(map_style, viz_type="Scatterplot"):
 
         # Use Risk Score for coloring
         df['color'] = df['risk_score'].apply(lambda x: get_color(x, 0, 100, palette='risk'))
-        tooltip_text = "ID: {id}\nConc: {concentration_CFU_per_100mL:.1f} CFU\nRisk Score: {risk_score:.1f}"
         
     else:
         # Fallback for old data
@@ -221,7 +250,6 @@ def view_pathogen_risk(map_style, viz_type="Scatterplot"):
         c3.metric("High Conc (>100)", len(df[df['concentration_CFU_per_100mL'] > 100]))
         
         df['color'] = df['concentration_CFU_per_100mL'].apply(lambda x: get_color(np.log1p(x), 0, np.log1p(1000), palette='risk'))
-        tooltip_text = "ID: {id}\nConc: {concentration_CFU_per_100mL:.1f} CFU"
 
     # Sort by risk score so high risk renders on top (z-order)
     if 'risk_score' in df.columns:
@@ -281,18 +309,17 @@ def view_pathogen_risk(map_style, viz_type="Scatterplot"):
             get_position=['long', 'lat'],
             get_fill_color='color',
             get_radius='radius',
-            pickable=True,
-            auto_highlight=True
+            pickable=False
         )
-        tooltip_text = "ID: {id}\nImprovement: +{improvement:.1f} pts"
         
-        # Overwrite tooltip for this view
-        st.pydeck_chart(pdk.Deck(
-            layers=[layer],
+        deck_kwargs = dict(
+            layers=[layer] + extra_layers,
             initial_view_state=pdk.ViewState(latitude=-6.165, longitude=39.202, zoom=10),
-            map_style=map_style,
-            tooltip={"text": tooltip_text}
-        ))
+            map_style=map_style
+        )
+        if tooltip:
+            deck_kwargs["tooltip"] = tooltip
+        st.pydeck_chart(pdk.Deck(**deck_kwargs))
         return
 
     else:
@@ -302,18 +329,20 @@ def view_pathogen_risk(map_style, viz_type="Scatterplot"):
             get_position=['long', 'lat'],
             get_fill_color='color',
             get_radius='radius',
-            pickable=True,
-            auto_highlight=True
+            pickable=False
         )
     
-    st.pydeck_chart(pdk.Deck(
-        layers=[layer],
+    deck_kwargs = dict(
+        layers=[layer] + extra_layers,
         initial_view_state=pdk.ViewState(latitude=-6.165, longitude=39.202, zoom=10),
-        map_style=map_style,
-        tooltip={"text": tooltip_text}
-    ))
+        map_style=map_style
+    )
+    if tooltip:
+        deck_kwargs["tooltip"] = tooltip
+    st.pydeck_chart(pdk.Deck(**deck_kwargs))
 
-def view_nitrogen_load(map_style, viz_type="Scatterplot"):
+def view_nitrogen_load(map_style, viz_type="Scatterplot", extra_layers=None, tooltip=None):
+    extra_layers = extra_layers or []
     st.header("🌱 Nitrogen Load")
     
     df = load_data(config.NET_NITROGEN_LOAD_PATH)
@@ -386,17 +415,20 @@ def view_nitrogen_load(map_style, viz_type="Scatterplot"):
             get_position=['long', 'lat'],
             get_fill_color='color',
             get_radius=100,
-            pickable=True
+            pickable=False
         )
     
-    st.pydeck_chart(pdk.Deck(
-        layers=[layer],
+    deck_kwargs = dict(
+        layers=[layer] + extra_layers,
         initial_view_state=pdk.ViewState(latitude=-6.165, longitude=39.202, zoom=10),
-        map_style=map_style,
-        tooltip={"text": "Load: {nitrogen_load} kg/yr"}
-    ))
+        map_style=map_style
+    )
+    if tooltip:
+        deck_kwargs["tooltip"] = tooltip
+    st.pydeck_chart(pdk.Deck(**deck_kwargs))
 
-def view_phosphorus_load(map_style, viz_type="Scatterplot"):
+def view_phosphorus_load(map_style, viz_type="Scatterplot", extra_layers=None, tooltip=None):
+    extra_layers = extra_layers or []
     st.header("🧼 Phosphorus Load")
     
     df = load_data(config.NET_PHOSPHORUS_LOAD_PATH)
@@ -469,17 +501,20 @@ def view_phosphorus_load(map_style, viz_type="Scatterplot"):
             get_position=['long', 'lat'],
             get_fill_color='color',
             get_radius=100,
-            pickable=True
+            pickable=False
         )
     
-    st.pydeck_chart(pdk.Deck(
-        layers=[layer],
+    deck_kwargs = dict(
+        layers=[layer] + extra_layers,
         initial_view_state=pdk.ViewState(latitude=-6.165, longitude=39.202, zoom=10),
-        map_style=map_style,
-        tooltip={"text": "Load: {phosphorus_load} kg/yr"}
-    ))
+        map_style=map_style
+    )
+    if tooltip:
+        deck_kwargs["tooltip"] = tooltip
+    st.pydeck_chart(pdk.Deck(**deck_kwargs))
 
-def view_toilet_inventory(map_style):
+def view_toilet_inventory(map_style, extra_layers=None, tooltip=None):
+    extra_layers = extra_layers or []
     st.header("🚽 Toilet Inventory")
     
     df = load_data(config.SANITATION_STANDARDIZED_PATH)
@@ -509,15 +544,17 @@ def view_toilet_inventory(map_style):
         get_position=['long', 'lat'],
         get_fill_color='color',
         get_radius=15,
-        pickable=True
+        pickable=False
     )
     
-    st.pydeck_chart(pdk.Deck(
-        layers=[layer],
+    deck_kwargs = dict(
+        layers=[layer] + extra_layers,
         initial_view_state=pdk.ViewState(latitude=-6.165, longitude=39.202, zoom=10),
-        map_style=map_style,
-        tooltip={"text": "Type: {type_label}"}
-    ))
+        map_style=map_style
+    )
+    if tooltip:
+        deck_kwargs["tooltip"] = tooltip
+    st.pydeck_chart(pdk.Deck(**deck_kwargs))
 
 # --- Main Layout ---
 
@@ -652,6 +689,11 @@ def main():
             index=0,
             help="Scatterplot shows individual points. Heatmap shows density/intensity."
         )
+        show_wards = st.checkbox(
+            "Show wards layer",
+            value=False,
+            help="Toggle administrative boundaries with ward/district/region names."
+        )
     
     style_map = {
         "Light": "mapbox://styles/mapbox/light-v9",
@@ -661,18 +703,29 @@ def main():
     }
     current_style = style_map.get(map_style, "mapbox://styles/mapbox/light-v9")
 
-    if view == "Pathogen Risk":
-        view_pathogen_risk(current_style, viz_type)
-    elif view == "Nitrogen Load":
-        view_nitrogen_load(current_style, viz_type)
-    elif view == "Phosphorus Load":
-        view_phosphorus_load(current_style, viz_type)
-    elif view == "Toilet Inventory":
-        view_toilet_inventory(current_style) # Keep inventory as scatter for categorical clarity
-    elif view == "Model vs Reality":
-        view_model_vs_reality(current_style)
+    extra_layers = []
+    tooltip = None
+    if show_wards:
+        wards_layer = build_wards_layer()
+        if wards_layer:
+            extra_layers.append(wards_layer)
+            tooltip = {"text": "Ward: {ward_name}\nDistrict: {dist_name}\nRegion: {reg_name}"}
+        else:
+            st.sidebar.warning("Wards GeoJSON missing or invalid.")
 
-def view_model_vs_reality(map_style):
+    if view == "Pathogen Risk":
+        view_pathogen_risk(current_style, viz_type, extra_layers, tooltip)
+    elif view == "Nitrogen Load":
+        view_nitrogen_load(current_style, viz_type, extra_layers, tooltip)
+    elif view == "Phosphorus Load":
+        view_phosphorus_load(current_style, viz_type, extra_layers, tooltip)
+    elif view == "Toilet Inventory":
+        view_toilet_inventory(current_style, extra_layers, tooltip) # Keep inventory as scatter for categorical clarity
+    elif view == "Model vs Reality":
+        view_model_vs_reality(current_style, extra_layers, tooltip)
+
+def view_model_vs_reality(map_style, extra_layers=None, tooltip=None):
+    extra_layers = extra_layers or []
     st.header("⚖️ Model vs Reality (Calibration)")
     
     from app.calibration_engine import CalibrationEngine
@@ -731,15 +784,17 @@ def view_model_vs_reality(map_style):
         get_position=['long', 'lat'],
         get_fill_color='color',
         get_radius=100,
-        pickable=True
+        pickable=False
     )
     
-    st.pydeck_chart(pdk.Deck(
-        layers=[layer],
+    deck_kwargs = dict(
+        layers=[layer] + extra_layers,
         initial_view_state=pdk.ViewState(latitude=-6.165, longitude=39.202, zoom=10),
-        map_style=map_style,
-        tooltip={"text": "Obs (Total Coli): {fio_obs}\nPred: {model_conc}\nDiff: {log_diff:.2f}"}
-    ))
+        map_style=map_style
+    )
+    if tooltip:
+        deck_kwargs["tooltip"] = tooltip
+    st.pydeck_chart(pdk.Deck(**deck_kwargs))
 
 if __name__ == "__main__":
     main()

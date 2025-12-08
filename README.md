@@ -24,10 +24,16 @@ Outputs go to `data/output/`:
 - Phosphorus: `phosphorus_load_layer1.csv`
 
 ### Dashboard
+Run the FIO pipeline first so the dashboard has data:
 ```bash
-python main.py dashboard
+python main.py pipeline --model fio --scenario baseline_2025
 ```
-Use the sidebar to switch views (Pathogen Risk, Nitrogen Load, Phosphorus Load, Toilet Inventory) and rerun scenarios.
+Then launch Streamlit:
+```bash
+streamlit run app/dashboard.py
+# or: python -m streamlit run app/dashboard.py
+```
+Open the URL Streamlit prints (default http://localhost:8501). Use the sidebar to switch views (Pathogen Risk, Nitrogen Load, Phosphorus Load, Toilet Inventory) and rerun scenarios.
 
 ### Calibration
 To run the calibration suite (grid search + random forest cross-validation):
