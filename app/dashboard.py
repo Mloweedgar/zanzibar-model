@@ -55,9 +55,9 @@ def get_color(val, min_val, max_val, palette='risk'):
     if palette == 'risk':
         # Multi-stop: Blue (0) -> Green (0.25) -> Yellow (0.5) -> Orange (0.75) -> Red (1.0)
         # This gives more resolution than simple 2-stop interpolation
-        # Dramatic color palette: Cyan (Safe) -> Lime (Low) -> Yellow (Moderate) -> Orange (High) -> Deep Red (Critical)
+        # Dramatic color palette: Blue (Safe) -> Lime (Low) -> Yellow (Moderate) -> Orange (High) -> Deep Red (Critical)
         stops = {
-            0.00: [0, 255, 255],    # Bright Cyan (Safe) - eye-catching safe zones
+            0.00: [0, 120, 255],    # Bright Blue (Safe)
             0.25: [0, 255, 0],      # Lime Green (Low)
             0.50: [255, 255, 0],    # Yellow (Moderate)
             0.60: [255, 165, 0],    # Orange (High) - standard orange
@@ -214,30 +214,30 @@ def view_pathogen_risk(map_style, viz_type="Scatterplot", extra_layers=None, too
         
         cols = st.columns(5)
         
-        # Safe (Cyan)
+        # Safe (Blue)
         c = counts.get('Safe', 0)
         p = (c / total) * 100 if total > 0 else 0
-        cols[0].metric("🔵 Safe", f"{c:,}", f"{p:.1f}%")
+        cols[0].metric("🔵 Safe (0-25)", f"{c:,}", f"{p:.1f}%")
         
         # Moderate (Green)
         c = counts.get('Moderate', 0)
         p = (c / total) * 100 if total > 0 else 0
-        cols[1].metric("🟢 Moderate", f"{c:,}", f"{p:.1f}%")
+        cols[1].metric("🟢 Moderate (25-50)", f"{c:,}", f"{p:.1f}%")
         
         # High (Yellow)
         c = counts.get('High', 0)
         p = (c / total) * 100 if total > 0 else 0
-        cols[2].metric("🟡 High", f"{c:,}", f"{p:.1f}%")
+        cols[2].metric("🟡 High (50-60)", f"{c:,}", f"{p:.1f}%")
         
         # Very High (Orange)
         c = counts.get('Very High', 0)
         p = (c / total) * 100 if total > 0 else 0
-        cols[3].metric("🟠 V. High", f"{c:,}", f"{p:.1f}%")
+        cols[3].metric("🟠 V. High (60-90)", f"{c:,}", f"{p:.1f}%")
         
         # Critical (Red)
         c = counts.get('Critical', 0)
         p = (c / total) * 100 if total > 0 else 0
-        cols[4].metric("🔴 Critical", f"{c:,}", f"{p:.1f}%")
+        cols[4].metric("🔴 Critical (>90)", f"{c:,}", f"{p:.1f}%")
 
         # Use Risk Score for coloring
         df['color'] = df['risk_score'].apply(lambda x: get_color(x, 0, 100, palette='risk'))
@@ -340,6 +340,7 @@ def view_pathogen_risk(map_style, viz_type="Scatterplot", extra_layers=None, too
     if tooltip:
         deck_kwargs["tooltip"] = tooltip
     st.pydeck_chart(pdk.Deck(**deck_kwargs))
+    st.caption("Risk score is 0–100 = 20·log10(conc+1); each 10× jump ≈ +20 points. Buckets: 0–25 Safe, 25–50 Moderate, 50–60 High, 60–90 Very High, >90 Critical.")
 
 def view_nitrogen_load(map_style, viz_type="Scatterplot", extra_layers=None, tooltip=None):
     extra_layers = extra_layers or []
@@ -367,7 +368,7 @@ def view_nitrogen_load(map_style, viz_type="Scatterplot", extra_layers=None, too
         
         cols = st.columns(3)
         cols[0].metric("🟢 Low", "0", "0.0%")
-        cols[1].metric("🟡 Moderate", f"{total_points:,}", "100.0%")
+        cols[1].metric("🟡 Moderate (~uniform)", f"{total_points:,}", "100.0%")
         cols[2].metric("🔴 High", "0", "0.0%")
     else:
         bins = [0, q33, q67, df['nitrogen_load'].max() + 1]
@@ -381,17 +382,17 @@ def view_nitrogen_load(map_style, viz_type="Scatterplot", extra_layers=None, too
         # Low (Green)
         c = cats.get('Low', 0)
         p = (c / total_points) * 100 if total_points > 0 else 0
-        cols[0].metric("🟢 Low", f"{c:,}", f"{p:.1f}%")
+        cols[0].metric(f"🟢 Low (≤{q33:.1f})", f"{c:,}", f"{p:.1f}%")
         
         # Moderate (Yellow)
         c = cats.get('Moderate', 0)
         p = (c / total_points) * 100 if total_points > 0 else 0
-        cols[1].metric("🟡 Moderate", f"{c:,}", f"{p:.1f}%")
+        cols[1].metric(f"🟡 Moderate ({q33:.1f}-{q67:.1f})", f"{c:,}", f"{p:.1f}%")
         
         # High (Red)
         c = cats.get('High', 0)
         p = (c / total_points) * 100 if total_points > 0 else 0
-        cols[2].metric("🔴 High", f"{c:,}", f"{p:.1f}%")
+        cols[2].metric(f"🔴 High (>{q67:.1f})", f"{c:,}", f"{p:.1f}%")
     
     # Map - Dynamic color scale based on data distribution
     # Use 95th percentile as max to show variation in most of the data
@@ -426,6 +427,7 @@ def view_nitrogen_load(map_style, viz_type="Scatterplot", extra_layers=None, too
     if tooltip:
         deck_kwargs["tooltip"] = tooltip
     st.pydeck_chart(pdk.Deck(**deck_kwargs))
+    st.caption("Buckets are based on this run’s 33rd/67th percentiles (kg/yr): Low ≤P33, Moderate P33–P67, High >P67. If values cluster tightly, everything shows “Moderate (~uniform)” to signal there’s no real gradient.")
 
 def view_phosphorus_load(map_style, viz_type="Scatterplot", extra_layers=None, tooltip=None):
     extra_layers = extra_layers or []
@@ -453,7 +455,7 @@ def view_phosphorus_load(map_style, viz_type="Scatterplot", extra_layers=None, t
         
         cols = st.columns(3)
         cols[0].metric("🔵 Low", "0", "0.0%")
-        cols[1].metric("🟣 Moderate", f"{total_points:,}", "100.0%")
+        cols[1].metric("🟣 Moderate (~uniform)", f"{total_points:,}", "100.0%")
         cols[2].metric("🟤 High", "0", "0.0%")
     else:
         bins = [0, q33, q67, df['phosphorus_load'].max() + 1]
@@ -467,17 +469,17 @@ def view_phosphorus_load(map_style, viz_type="Scatterplot", extra_layers=None, t
         # Low (Blue)
         c = cats.get('Low', 0)
         p = (c / total_points) * 100 if total_points > 0 else 0
-        cols[0].metric("🔵 Low", f"{c:,}", f"{p:.1f}%")
+        cols[0].metric(f"🔵 Low (≤{q33:.3f})", f"{c:,}", f"{p:.1f}%")
         
         # Moderate (Purple)
         c = cats.get('Moderate', 0)
         p = (c / total_points) * 100 if total_points > 0 else 0
-        cols[1].metric("🟣 Moderate", f"{c:,}", f"{p:.1f}%")
+        cols[1].metric(f"🟣 Moderate ({q33:.3f}-{q67:.3f})", f"{c:,}", f"{p:.1f}%")
         
         # High (Brown)
         c = cats.get('High', 0)
         p = (c / total_points) * 100 if total_points > 0 else 0
-        cols[2].metric("🟤 High", f"{c:,}", f"{p:.1f}%")
+        cols[2].metric(f"🟤 High (>{q67:.3f})", f"{c:,}", f"{p:.1f}%")
     
     # Map - Dynamic color scale based on data distribution
     # Use 95th percentile as max to show variation in most of the data
@@ -560,7 +562,7 @@ def view_toilet_inventory(map_style, extra_layers=None, tooltip=None):
 
 def main():
     st.sidebar.title("Zanzibar Model")
-    view = st.sidebar.radio("View", ["Pathogen Risk", "Nitrogen Load", "Phosphorus Load", "Toilet Inventory", "Model vs Reality"])
+    view = st.sidebar.radio("View", ["Pathogen Risk", "Nitrogen Load", "Phosphorus Load", "Toilet Inventory"])
     
     # Scenario Selection
     st.sidebar.markdown("---")
@@ -721,80 +723,8 @@ def main():
         view_phosphorus_load(current_style, viz_type, extra_layers, tooltip)
     elif view == "Toilet Inventory":
         view_toilet_inventory(current_style, extra_layers, tooltip) # Keep inventory as scatter for categorical clarity
-    elif view == "Model vs Reality":
-        view_model_vs_reality(current_style, extra_layers, tooltip)
-
-def view_model_vs_reality(map_style, extra_layers=None, tooltip=None):
-    extra_layers = extra_layers or []
-    st.header("⚖️ Model vs Reality (Calibration)")
-    
-    from app.calibration_engine import CalibrationEngine
-    
-    # Initialize Engine
-    calib = CalibrationEngine()
-    
-    # Load Model Data (Default to FIO for now)
-    if not calib.load_model_results('fio'):
-        st.error("Could not load model results. Run the pipeline first.")
-        return
-        
-    # Match Points
-    with st.spinner("Matching model predictions to government data..."):
-        matched = calib.match_points()
-        
-    if matched.empty:
-        st.warning("No matching data found.")
-        return
-        
-    # Calculate Metrics
-    metrics = calib.calculate_metrics(matched)
-    
-    # Display Metrics
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Samples", metrics.get('n_samples', 0))
-    c2.metric("RMSE (Log)", f"{metrics.get('rmse_log', 0):.2f}")
-    c3.metric("Correlation", f"{metrics.get('correlation', 0):.2f}")
-    
-    # Scatter Plot (Observed vs Predicted)
-    st.subheader("Observed vs Predicted")
-    st.scatter_chart(
-        matched,
-        x='fio_obs',
-        y='model_conc',
-        color='#ff0000'
-    )
-    
-    # Map of Residuals (Error)
-    st.subheader("Error Map (Log Difference)")
-    # Calculate residual for visualization
-    # Positive = Model Overestimates, Negative = Model Underestimates
-    matched['log_diff'] = np.log1p(matched['model_conc']) - np.log1p(matched['fio_obs'])
-    matched['abs_diff'] = matched['log_diff'].abs()
-    
-    # Color scale: Blue (Under) -> White (Good) -> Red (Over)
-    matched['color'] = matched['log_diff'].apply(lambda x: 
-        [255, 0, 0, 200] if x > 1 else       # Overestimate
-        [0, 0, 255, 200] if x < -1 else      # Underestimate
-        [0, 255, 0, 200]                     # Good match
-    )
-    
-    layer = pdk.Layer(
-        "ScatterplotLayer",
-        matched,
-        get_position=['long', 'lat'],
-        get_fill_color='color',
-        get_radius=100,
-        pickable=False
-    )
-    
-    deck_kwargs = dict(
-        layers=[layer] + extra_layers,
-        initial_view_state=pdk.ViewState(latitude=-6.165, longitude=39.202, zoom=10),
-        map_style=map_style
-    )
-    if tooltip:
-        deck_kwargs["tooltip"] = tooltip
-    st.pydeck_chart(pdk.Deck(**deck_kwargs))
+    elif view == "Toilet Inventory":
+        view_toilet_inventory(current_style, extra_layers, tooltip) # Keep inventory as scatter for categorical clarity
 
 if __name__ == "__main__":
     main()

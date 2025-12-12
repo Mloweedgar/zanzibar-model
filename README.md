@@ -45,6 +45,9 @@ This will:
 2. Save the best parameters to `data/output/calibration_grid_results.csv`.
 3. Run a Random Forest cross-validation to estimate the theoretical best performance.
 
+Interpreting calibration metrics (for presentations):
+- `rmse_log` is computed in log space (`ln(pred+1)` vs `ln(obs+1)`). An `rmse_log` of 3 means the typical multiplicative error is ~`exp(3) ≈ 20×`, so results are indicative trends rather than precise point predictions. Closer to 1 (~2.7× error) is materially better.
+
 
 ### Inputs
 - Derived/bundled inputs already in `data/derived/`: `private_boreholes_enriched.csv`, `government_boreholes_enriched.csv`, `sanitation_standardized.csv`.

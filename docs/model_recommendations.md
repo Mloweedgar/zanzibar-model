@@ -1,11 +1,10 @@
-# Zanzibar FIO Model – Plain-Language Recommendations
+# Zanzibar FIO Model – Recommendations
 
-## Why you are reading this
 The current model structure (how it calculates and spreads contamination) is fine, but the inputs we have do not carry the signal we need. To make the model useful for ranking risky areas, we need a few concrete data upgrades. This note explains what, why, and how we would use them in simple terms.
 
 ## What already works
 - The math steps are sensible: estimate germs released → fade with distance → dilute by how much water is pumped.
-- The code is ready to accept better inputs without a rebuild; we can plug new tables in and rerun.
+- The code is ready to accept better inputs; we can plug new tables in and rerun.
 
 ## What is missing (and examples)
 1) **How water really moves underground**
@@ -23,10 +22,6 @@ The current model structure (how it calculates and spreads contamination) is fin
    - Why: we currently assume 10 people per household and coarse containment values, so most toilets look the same to the model.
    - Example: “Household has 4 people and a lined pit that rarely leaks” should count much less than “Household has 12 people and an unlined, overflowing pit.”
 
-4) **Timing**
-   - What to collect: the date each water sample was taken, and whether pumping or sanitation use was typical then (e.g., rainy vs dry season).
-   - Why: we need the model to simulate the same period as the measurements; otherwise we compare the wrong day/season.
-   - Example: if samples were in the dry season, turn down seasonal inflow in the model for that run.
 
 ## Nice-to-have extras
 - **Background floor:** add a small baseline concentration (e.g., median observed) so wells with near-zero flow do not collapse to zero in the model.
